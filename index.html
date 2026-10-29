@@ -1,0 +1,1888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Life Unit Calculator</title>
+<meta name="description" content="Quote any price in Life Units and in time of an abundant day, from a published fix. Works offline from a file.">
+<style>
+  :root {
+    /* The UA follows the page's theme: the number spinner, the file
+       button, the select popup and the scrollbars switch with it
+       (review round 3: they stayed light on the dark page). */
+    color-scheme: light dark;
+    --bg: #f6f5f1;
+    --fg: #1c1c1a;
+    --muted: #5f5e59;
+    --card: #ffffff;
+    --border: #d8d5cc;
+    --accent: #1f5f8b;
+    --accent-fg: #ffffff;
+    --ok: #1d6b3a;
+    --ok-bg: #e4f3e9;
+    --warn: #7a4300;
+    --warn-bg: #fff1d6;
+    --fail: #8f1d1d;
+    --fail-bg: #fbe4e4;
+    --mono: ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15161a;
+      --fg: #e8e6df;
+      --muted: #a39f94;
+      --card: #1e2026;
+      --border: #363942;
+      --accent: #7fb3dc;
+      --accent-fg: #0f1a24;
+      --ok: #8fd4a6;
+      --ok-bg: #16311f;
+      --warn: #f2c66d;
+      --warn-bg: #3a2a0a;
+      --fail: #f0a0a0;
+      --fail-bg: #3d1717;
+    }
+  }
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #15161a;
+    --fg: #e8e6df;
+    --muted: #a39f94;
+    --card: #1e2026;
+    --border: #363942;
+    --accent: #7fb3dc;
+    --accent-fg: #0f1a24;
+    --ok: #8fd4a6;
+    --ok-bg: #16311f;
+    --warn: #f2c66d;
+    --warn-bg: #3a2a0a;
+    --fail: #f0a0a0;
+    --fail-bg: #3d1717;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+    max-width: 720px;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-width: 0;
+  }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; line-height: 1.2; }
+  h2 { font-size: 1.1rem; margin: 0 0 12px; }
+  p { margin: 0 0 12px; }
+  .tagline { color: var(--muted); margin-bottom: 16px; }
+  .muted { color: var(--muted); font-size: 1rem; }
+  .banner {
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin: 0 0 16px;
+    border: 1px solid var(--warn);
+    background: var(--warn-bg);
+    color: var(--warn);
+    font-weight: 600;
+  }
+  section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 0 0 16px;
+    min-width: 0;
+  }
+  /* 16px in every input: below that iOS Safari zooms the page on focus. */
+  label { display: block; font-size: 1rem; color: var(--muted); margin-bottom: 10px; }
+  label > span { display: block; margin-bottom: 4px; }
+  input[type="number"], input[type="text"], select, input[type="file"] {
+    width: 100%;
+    max-width: 100%;
+    font: inherit;
+    font-size: 1rem;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+  }
+  input[type="file"] { padding: 8px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > label { flex: 1 1 140px; min-width: 0; }
+  button {
+    font: inherit;
+    padding: 10px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--accent-fg);
+    cursor: pointer;
+    margin: 0 8px 8px 0;
+  }
+  button.secondary { background: transparent; color: var(--accent); }
+  .result { padding: 12px 0 4px; }
+  .big { font-size: 2rem; font-weight: 700; line-height: 1.2; word-break: break-word; }
+  .time { font-size: 1.1rem; margin: 4px 0 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 1rem; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .scroll { overflow-x: auto; max-width: 100%; }
+  .scroll table { min-width: 960px; }
+  #readings-table td:last-child { min-width: 260px; }
+  dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 4px 12px; margin: 0 0 12px; font-size: 1rem; }
+  dt { color: var(--muted); }
+  /* overflow-wrap: anywhere breaks only a run that cannot otherwise fit
+     (a 64-character hash, a JSON string) and leaves words whole. */
+  dd { margin: 0; font-family: var(--mono); font-size: 1rem; word-break: normal; overflow-wrap: anywhere; min-width: 0; }
+  /* The disclosure rows are tap targets like the buttons (44px); the
+     negative margins keep the card's rhythm (review round 3). Not
+     display: flex, which removes the marker in Chromium. */
+  details > summary { cursor: pointer; font-weight: 600; padding: 10px 0; margin: -10px 0 -2px; }
+  .report {
+    font-family: var(--mono);
+    font-size: 1rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    margin: 8px 0 0;
+  }
+  /* One block per report line, with a hanging indent on its wrapped
+     continuation lines (review round 3). */
+  .report div { padding-left: 1.5em; text-indent: -1.5em; }
+  .report.ok { border-color: var(--ok); background: var(--ok-bg); color: var(--ok); }
+  .report.fail { border-color: var(--fail); background: var(--fail-bg); color: var(--fail); }
+  .status { font-size: 1rem; margin: 8px 0 0; }
+  .mark-in { color: var(--ok); font-weight: 600; }
+  .mark-out { color: var(--muted); }
+  footer { color: var(--muted); font-size: 1rem; }
+  @media (max-width: 480px) {
+    /* The Life-time column says the same quantity in words, and the LU
+       figure is in the quote box, so the Life Units column goes. The
+       time wraps onto two lines where it must; a nowrap on it pushed
+       the table past the card at 375px (review round 2). */
+    #everyday-table th:nth-child(3), #everyday-table td:nth-child(3) { display: none; }
+    th, td { padding: 6px 4px; }
+    /* The Notes column sits offscreen in the sideways scroller and
+       wrapped at 260px, so each row was a tall band of blank space in
+       the visible slice (review round 4). On a phone a note stays on
+       one line, far right, where only a reader who scrolls for it
+       sees it. */
+    #readings-table td:last-child { white-space: nowrap; min-width: 0; }
+  }
+  @media (max-width: 420px) {
+    dl { grid-template-columns: 1fr; gap: 0 0; }
+    dt { margin-top: 6px; }
+    .big { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Life Unit Calculator</h1>
+  <p class="tagline">Life is the way it can be measured in units. Life Units.</p>
+  <div id="placeholder-banner" class="banner" hidden>placeholder data</div>
+</header>
+
+<section id="quote-section">
+  <h2>Quote</h2>
+  <div class="row">
+    <label><span>Amount</span><input id="amount" type="number" inputmode="decimal" min="0" step="any" value="1"></label>
+    <label><span>Currency or coin</span><select id="currency"></select></label>
+  </div>
+  <div class="result">
+    <div class="big" id="result-lu"></div>
+    <div class="time" id="result-time"></div>
+    <div class="muted" id="result-note"></div>
+  </div>
+  <details id="coin-details">
+    <summary>Coin price (optional)</summary>
+    <p class="muted">By default a coin is priced at the fix's reference rate. Enter the price of one Bitcoin in a currency to quote BTC and SAT at that price instead. Nothing is fetched unless you press the button.</p>
+    <div class="row">
+      <label><span>Price of 1 BTC</span><input id="coin-price" type="number" inputmode="decimal" min="0" step="any" placeholder="from the fix"></label>
+      <label><span>In</span><select id="coin-currency"></select></label>
+    </div>
+    <button type="button" id="fetch-live">Fetch live coin prices</button>
+    <button type="button" id="clear-coin" class="secondary">Clear</button>
+    <p class="muted">The button calls api.coingecko.com once, only when pressed, and fills the price field. Offline it fails and says so.</p>
+    <p class="status" id="live-status"></p>
+  </details>
+</section>
+
+<section id="everyday-section">
+  <h2>Everyday things</h2>
+  <p class="muted">Priced in USD from the World Clock list, quoted through the fix's B_USD.</p>
+  <table id="everyday-table">
+    <thead><tr><th>Thing</th><th class="num">USD</th><th class="num">Life Units</th><th>Life-time</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<section id="fix-section">
+  <h2>Fix file</h2>
+  <p id="fix-summary" class="muted"></p>
+  <label><span>Load another fix (a JSON file published by the formula engine)</span>
+    <input type="file" id="fix-file" accept=".json,application/json">
+  </label>
+  <p id="fix-load-status" class="muted"></p>
+</section>
+
+<section id="work-section">
+  <details>
+    <summary>Show the work</summary>
+    <dl id="work-list"></dl>
+    <p class="muted">City readings. R = C / B, baskets per abundant day, in the city's own currency. The trim drops the top and bottom share by count, rounded down, and averages the rest. The table scrolls sideways on narrow screens.</p>
+    <div class="scroll">
+      <table id="readings-table">
+        <thead><tr>
+          <th>City</th><th>Currency</th><th>In trim</th><th class="num">S (spending/day)</th><th class="num">Income tax/day</th><th class="num">C (day cost)</th><th class="num">B (basket)</th><th class="num">R = C/B</th><th>Clip</th><th>Notes</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p style="margin-top:12px">
+      <button type="button" id="verify">Verify</button>
+      <span class="muted">Recomputes the trimmed mean and B_X from the readings above, in this page, and compares with the published numbers.</span>
+    </p>
+    <div id="verify-output" class="report" hidden></div>
+  </details>
+</section>
+
+<footer>
+  <p>One Life Unit is one day of abundant life. Price in LU = (price in X / B_X) / LU, where B_X is the basket's price in X and LU is the Daily Fixed Life Unit in baskets. Quotes through a currency carry reference-rate noise; they are a convenience, not the fix.</p>
+  <p id="footer-version"></p>
+</footer>
+
+<script src="lu.js"></script>
+<script>
+/* The embedded fix: sample/fix-placeholder-2026-10-20.json as generated
+   by lucalc, inlined so the page works from a file:// URL without fetch.
+   Placeholder data: nothing in it was witnessed. Regenerate the sample
+   with python3 -m lucalc fix (see README.md), then splice it between the
+   two markers below (the JSON object, nothing else). */
+var PLACEHOLDER_FIX = /* PLACEHOLDER_FIX_BEGIN */
+{
+  "averaging": "none; daily values",
+  "b_usd_per_city": {
+    "london": 157229.8,
+    "milan": 149673.7,
+    "paris": 152333.5,
+    "singapore": 160537.5,
+    "sydney": 151688.67
+  },
+  "b_x": {
+    "AUD": 229478.592039801,
+    "BTC": 1.8524175502,
+    "EUR": 139773.3242424242,
+    "GBP": 118269.7358974359,
+    "SAT": 185241755.02008033,
+    "SGD": 205000.8755555556,
+    "USD": 153750.6566666667
+  },
+  "b_x_cities": [
+    "sydney",
+    "paris",
+    "london"
+  ],
+  "basket_factor": 1.0,
+  "catalog_hash": "dd31f751328f8e32b287d0e862b0d52ad10576c42f800f10f65a0bfa81e3e520",
+  "catalog_hash_without_sources": "aa41f1dd09f528b260c9cdb9e4c3b2070ae35a04ab9d3a56073615f3643529b7",
+  "catalog_version": "0.9.0-placeholder",
+  "chain": {
+    "base_period": "2026-10",
+    "basis": {
+      "basket": [
+        {
+          "id": "car_trim",
+          "quantity": 1.0
+        },
+        {
+          "id": "jeans",
+          "quantity": 1.0
+        },
+        {
+          "id": "laptop",
+          "quantity": 1.0
+        },
+        {
+          "id": "phone",
+          "quantity": 1.0
+        },
+        {
+          "id": "shoes",
+          "quantity": 1.0
+        },
+        {
+          "id": "watch",
+          "quantity": 1.0
+        }
+      ],
+      "cities": [
+        "london",
+        "milan",
+        "paris",
+        "singapore",
+        "sydney"
+      ],
+      "lines": [
+        {
+          "components": {},
+          "id": "basket",
+          "quantity_per_day": null
+        },
+        {
+          "components": {},
+          "id": "everything_else",
+          "quantity_per_day": 1.0
+        },
+        {
+          "components": {},
+          "id": "food",
+          "quantity_per_day": 1.0
+        },
+        {
+          "components": {},
+          "id": "fuel_energy",
+          "quantity_per_day": 12.0
+        },
+        {
+          "components": {
+            "home_insurance": {
+              "rate": 0.002,
+              "type": "rate_of_value"
+            },
+            "upkeep": {
+              "rate": 0.01,
+              "type": "rate_of_value"
+            }
+          },
+          "id": "home",
+          "quantity_per_day": null
+        },
+        {
+          "components": {},
+          "id": "income_tax",
+          "quantity_per_day": null
+        },
+        {
+          "components": {},
+          "id": "insurance",
+          "quantity_per_day": 0.0328767123
+        },
+        {
+          "components": {},
+          "id": "property_charge",
+          "quantity_per_day": null
+        },
+        {
+          "components": {},
+          "id": "travel",
+          "quantity_per_day": 1.0
+        },
+        {
+          "components": {},
+          "id": "vehicle",
+          "quantity_per_day": 0.000913242
+        }
+      ],
+      "rulebook": {
+        "home_cap_share": 0.2,
+        "min_sellers": 3,
+        "seller_tolerance": 0.25,
+        "trim_share": 0.2
+      }
+    },
+    "basis_hash": "b7f49313f8fba176c65c9cbf2051fac6ee10e027e20121eb76130e26827bf2be",
+    "basket_factor": 1.0,
+    "cumulative_factor": 1.0,
+    "history": []
+  },
+  "code_version": "0.9.0",
+  "coverage": {
+    "carried": 3,
+    "carried_lines": [
+      {
+        "city": "sydney",
+        "line": "insurance"
+      }
+    ],
+    "carried_share": 0.0285714286,
+    "clips": {
+      "london": 287.9142845126,
+      "milan": 323.8061281525,
+      "paris": 330.0281007615,
+      "singapore": 518.8939068722,
+      "sydney": 547.6072836106
+    },
+    "excluded_cities": [],
+    "flags": {
+      "london": [
+        "home clipped at the cap: 287.9142845126 per day clipped"
+      ],
+      "milan": [
+        "home clipped at the cap: 323.8061281525 per day clipped"
+      ],
+      "paris": [
+        "home clipped at the cap: 330.0281007615 per day clipped"
+      ],
+      "singapore": [
+        "home clipped at the cap: 518.8939068722 per day clipped"
+      ],
+      "sydney": [
+        "line insurance unwitnessed (2 accepted sellers): carried 1 day(s)",
+        "home clipped at the cap: 547.6072836106 per day clipped"
+      ]
+    },
+    "fresh": 101,
+    "fresh_share": 0.9619047619,
+    "ignored_reports": [],
+    "local_sources": [
+      "london.travel.1",
+      "london.travel.2",
+      "london.travel.3",
+      "london.travel.4",
+      "milan.travel.1",
+      "milan.travel.2",
+      "milan.travel.3",
+      "milan.travel.4",
+      "paris.travel.1",
+      "paris.travel.2",
+      "paris.travel.3",
+      "paris.travel.4",
+      "singapore.travel.1",
+      "singapore.travel.2",
+      "singapore.travel.3",
+      "singapore.travel.4",
+      "sydney.travel.1",
+      "sydney.travel.2",
+      "sydney.travel.3",
+      "sydney.travel.4"
+    ],
+    "missing": [
+      "sydney.insurance.3"
+    ],
+    "move_confirmed": [],
+    "move_confirmed_ex": [],
+    "move_limit_flags": [],
+    "move_limit_flags_ex": [],
+    "seller_drops": [
+      {
+        "city": "milan",
+        "deviation": 0.3999814738,
+        "line": "travel",
+        "median_of_others": 215.91,
+        "seller": "operator_d",
+        "value": 302.27
+      }
+    ],
+    "sources_total": 105,
+    "warnings": []
+  },
+  "cumulative_factor": 1.0,
+  "date": "2026-10-20",
+  "fix_hash": "583f0f07319e36a0e31f4a14c1ee406b9eb7adaaee8b2cc15dc13ed1defd9aa1",
+  "inputs_hash": "f0a3683e3efd0aa576f3719a7c7753152ec5e9660fffce3fee320c03e343d5cd",
+  "lu": 0.0159728267,
+  "lu_ex_income_tax": 0.0088181046,
+  "lu_ex_income_tax_raw": 0.0088181046,
+  "lu_raw": 0.0159728267,
+  "placeholder": true,
+  "previous_fix_hash": "df053448feab45eb351e1354079ad286c90c9686fe8a1b97b806f19090b1a1ea",
+  "previous_gap_days": 1,
+  "quote_currencies": [
+    "USD",
+    "EUR",
+    "GBP",
+    "SGD",
+    "AUD",
+    "BTC",
+    "SAT"
+  ],
+  "readings": {
+    "london": {
+      "B": 120946.0,
+      "B_linked": 120946.0,
+      "C": 1904.0135991966,
+      "C_ex": 1060.7025500399,
+      "R": 0.0157426752,
+      "R_ex": 0.0087700507,
+      "R_ex_fresh": 0.0087700507,
+      "R_ex_linked": 0.0087700507,
+      "R_fresh": 0.0157426752,
+      "R_linked": 0.0157426752,
+      "S": 1060.7025500399,
+      "basket_carried_days": 0,
+      "basket_items": {
+        "car_trim": 109500.0,
+        "jeans": 98,
+        "laptop": 1999,
+        "phone": 1199,
+        "shoes": 150,
+        "watch": 8000
+      },
+      "carried_lines": [],
+      "city_carried_days": 0,
+      "clip": 287.9142845126,
+      "continent": "Europe",
+      "country": "GB",
+      "currency": "GBP",
+      "excluded": false,
+      "flags": [
+        "home clipped at the cap: 287.9142845126 per day clipped"
+      ],
+      "home": {
+        "cap": 212.140510008,
+        "cap_share": 0.2,
+        "carried_days": 0,
+        "clip": 287.9142845126,
+        "daily_cost": 212.140510008,
+        "daily_cost_unclipped": 500.0547945205,
+        "divergence": 0.0418310971,
+        "duplicates": 1,
+        "home_insurance_per_day": 21.698630137,
+        "keyed_listings": 0,
+        "listings": 12,
+        "median_asking": 3960000.0,
+        "min_listings": 10,
+        "min_platforms": 3,
+        "platform_ids": [
+          "platform_a",
+          "platform_b",
+          "platform_c"
+        ],
+        "platforms": 3,
+        "price_per_day": 361.6438356164,
+        "property_charge_per_day": 8.2191780822,
+        "reason": null,
+        "reconciled": true,
+        "record_median": 3801000.0,
+        "rejected": 0,
+        "unique_listings": 11,
+        "upkeep_per_day": 108.4931506849,
+        "witnessed": true
+      },
+      "included": true,
+      "included_ex": true,
+      "income_tax_per_day": 843.3110491566,
+      "lines": {
+        "everything_else": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "retailer_a",
+            "retailer_b",
+            "retailer_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the named specifications and quantities",
+          "unit_price": 330.77,
+          "value": 330.77,
+          "witnessed": true
+        },
+        "food": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "chain_a",
+            "chain_b",
+            "chain_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the catalog's named food specifications (organic and premium lines, dining out)",
+          "unit_price": 115.38,
+          "value": 115.38,
+          "witnessed": true
+        },
+        "fuel_energy": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 12.0,
+          "sellers_accepted": [
+            "station_a",
+            "station_b",
+            "station_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per litre of premium unleaded",
+          "unit_price": 2.885,
+          "value": 34.62,
+          "witnessed": true
+        },
+        "insurance": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 0.0328767123,
+          "sellers_accepted": [
+            "insurer_a",
+            "insurer_b",
+            "insurer_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per month for the canonical insured",
+          "unit_price": 2222.76,
+          "value": 73.0770410319,
+          "witnessed": true
+        },
+        "travel": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "operator_a",
+            "operator_b",
+            "operator_c",
+            "operator_d"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the fixed routes, cabins and hotel class table",
+          "unit_price": 194.715,
+          "value": 194.715,
+          "witnessed": true
+        },
+        "vehicle": {
+          "carried_days": 0,
+          "class": "rulebook",
+          "quantity_per_day": 0.000913242,
+          "sellers_accepted": [
+            "maker"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency list price of the named premium trim",
+          "unit_price": 109500.0,
+          "value": 99.999999,
+          "witnessed": true
+        }
+      },
+      "move": 0.0056173628,
+      "move_confirmed": false,
+      "move_confirmed_ex": false,
+      "move_ex": 0.0053427623,
+      "move_limit_carried": false,
+      "move_limit_carried_ex": false,
+      "name": "London",
+      "qualification": {
+        "test_1_residents": "not run in this pass",
+        "test_2_open_records": "not run in this pass",
+        "test_3_reconciles": true,
+        "test_4_all_lines": true
+      },
+      "seller_drops": [],
+      "tax": {
+        "annual_spending": 387156.4307645762,
+        "effective_rate": 0.4429123035,
+        "gross_income": 694964.9637067476,
+        "income_tax_annual": 293909.2336680364,
+        "income_tax_per_day": 843.3110491566,
+        "schedule_status": "placeholder: shape of the UK schedule; to be read from the statute pages",
+        "social_annual": 13899.299274135
+      },
+      "trim_mark": "included"
+    },
+    "milan": {
+      "B": 136067.0,
+      "B_linked": 136067.0,
+      "C": 2197.3531873235,
+      "C_ex": 1187.5081720228,
+      "R": 0.0161490529,
+      "R_ex": 0.0087273782,
+      "R_ex_fresh": 0.0087273782,
+      "R_ex_linked": 0.0087273782,
+      "R_fresh": 0.0161490529,
+      "R_linked": 0.0161490529,
+      "S": 1187.5081720228,
+      "basket_carried_days": 0,
+      "basket_items": {
+        "car_trim": 122939.0,
+        "jeans": 115,
+        "laptop": 2299,
+        "phone": 1339,
+        "shoes": 175,
+        "watch": 9200
+      },
+      "carried_lines": [],
+      "city_carried_days": 0,
+      "clip": 323.8061281525,
+      "continent": "Europe",
+      "country": "IT",
+      "currency": "EUR",
+      "excluded": false,
+      "flags": [
+        "home clipped at the cap: 323.8061281525 per day clipped"
+      ],
+      "home": {
+        "cap": 237.5016344046,
+        "cap_share": 0.2,
+        "carried_days": 0,
+        "clip": 323.8061281525,
+        "daily_cost": 237.5016344046,
+        "daily_cost_unclipped": 561.3077625571,
+        "divergence": 0.0415479582,
+        "duplicates": 0,
+        "home_insurance_per_day": 24.0383561644,
+        "keyed_listings": 0,
+        "listings": 11,
+        "median_asking": 4387000.0,
+        "min_listings": 10,
+        "min_platforms": 3,
+        "platform_ids": [
+          "platform_a",
+          "platform_b",
+          "platform_c"
+        ],
+        "platforms": 3,
+        "price_per_day": 400.6392694064,
+        "property_charge_per_day": 16.4383561644,
+        "reason": null,
+        "reconciled": true,
+        "record_median": 4212000.0,
+        "rejected": 0,
+        "unique_listings": 11,
+        "upkeep_per_day": 120.1917808219,
+        "witnessed": true
+      },
+      "included": true,
+      "included_ex": false,
+      "income_tax_per_day": 1009.8450153007,
+      "lines": {
+        "everything_else": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "retailer_a",
+            "retailer_b",
+            "retailer_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the named specifications and quantities",
+          "unit_price": 371.36,
+          "value": 371.36,
+          "witnessed": true
+        },
+        "food": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "chain_a",
+            "chain_b",
+            "chain_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the catalog's named food specifications (organic and premium lines, dining out)",
+          "unit_price": 129.55,
+          "value": 129.55,
+          "witnessed": true
+        },
+        "fuel_energy": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 12.0,
+          "sellers_accepted": [
+            "station_a",
+            "station_b",
+            "station_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per litre of premium unleaded",
+          "unit_price": 3.239,
+          "value": 38.868,
+          "witnessed": true
+        },
+        "insurance": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 0.0328767123,
+          "sellers_accepted": [
+            "insurer_a",
+            "insurer_b",
+            "insurer_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per month for the canonical insured",
+          "unit_price": 2495.55,
+          "value": 82.0454793803,
+          "witnessed": true
+        },
+        "travel": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "operator_a",
+            "operator_b",
+            "operator_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [
+            {
+              "deviation": 0.3999814738,
+              "median_of_others": 215.91,
+              "seller": "operator_d",
+              "value": 302.27
+            }
+          ],
+          "unit": "local currency per day of the fixed routes, cabins and hotel class table",
+          "unit_price": 215.91,
+          "value": 215.91,
+          "witnessed": true
+        },
+        "vehicle": {
+          "carried_days": 0,
+          "class": "rulebook",
+          "quantity_per_day": 0.000913242,
+          "sellers_accepted": [
+            "maker"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency list price of the named premium trim",
+          "unit_price": 122939.0,
+          "value": 112.273058238,
+          "witnessed": true
+        }
+      },
+      "move": 0.0024559654,
+      "move_confirmed": false,
+      "move_confirmed_ex": false,
+      "move_ex": 0.0024768062,
+      "move_limit_carried": false,
+      "move_limit_carried_ex": false,
+      "name": "Milan",
+      "qualification": {
+        "test_1_residents": "not run in this pass",
+        "test_2_open_records": "not run in this pass",
+        "test_3_reconciles": true,
+        "test_4_all_lines": true
+      },
+      "seller_drops": [
+        {
+          "deviation": 0.3999814738,
+          "line": "travel",
+          "median_of_others": 215.91,
+          "seller": "operator_d",
+          "value": 302.27
+        }
+      ],
+      "tax": {
+        "annual_spending": 433440.4827883334,
+        "effective_rate": 0.4595733727,
+        "gross_income": 802033.9133730887,
+        "income_tax_annual": 357565.4305847554,
+        "income_tax_per_day": 1009.8450153007,
+        "schedule_status": "placeholder: shape of the Italian schedule with regional and municipal additions folded in; to be read from the statute pages",
+        "social_annual": 11028.0
+      },
+      "trim_mark": "included"
+    },
+    "paris": {
+      "B": 138485.0,
+      "B_linked": 138485.0,
+      "C": 2543.4812429175,
+      "C_ex": 1215.9416879731,
+      "R": 0.0183664747,
+      "R_ex": 0.0087803133,
+      "R_ex_fresh": 0.0087803133,
+      "R_ex_linked": 0.0087803133,
+      "R_fresh": 0.0183664747,
+      "R_linked": 0.0183664747,
+      "S": 1215.9416879731,
+      "basket_carried_days": 0,
+      "basket_items": {
+        "car_trim": 125527.0,
+        "jeans": 110,
+        "laptop": 2249,
+        "phone": 1329,
+        "shoes": 170,
+        "watch": 9100
+      },
+      "carried_lines": [],
+      "city_carried_days": 0,
+      "clip": 330.0281007615,
+      "continent": "Europe",
+      "country": "FR",
+      "currency": "EUR",
+      "excluded": false,
+      "flags": [
+        "home clipped at the cap: 330.0281007615 per day clipped"
+      ],
+      "home": {
+        "cap": 243.1883375946,
+        "cap_share": 0.2,
+        "carried_days": 0,
+        "clip": 330.0281007615,
+        "daily_cost": 243.1883375946,
+        "daily_cost_unclipped": 573.2164383562,
+        "divergence": 0.0416474919,
+        "duplicates": 0,
+        "home_insurance_per_day": 24.8054794521,
+        "keyed_listings": 0,
+        "listings": 11,
+        "median_asking": 4527000.0,
+        "min_listings": 10,
+        "min_platforms": 3,
+        "platform_ids": [
+          "platform_a",
+          "platform_b",
+          "platform_c"
+        ],
+        "platforms": 3,
+        "price_per_day": 413.4246575342,
+        "property_charge_per_day": 10.9589041096,
+        "reason": null,
+        "reconciled": true,
+        "record_median": 4346000.0,
+        "rejected": 0,
+        "unique_listings": 11,
+        "upkeep_per_day": 124.0273972603,
+        "witnessed": true
+      },
+      "included": false,
+      "included_ex": true,
+      "income_tax_per_day": 1327.5395549444,
+      "lines": {
+        "everything_else": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "retailer_a",
+            "retailer_b",
+            "retailer_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the named specifications and quantities",
+          "unit_price": 379.18,
+          "value": 379.18,
+          "witnessed": true
+        },
+        "food": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "chain_a",
+            "chain_b",
+            "chain_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the catalog's named food specifications (organic and premium lines, dining out)",
+          "unit_price": 132.27,
+          "value": 132.27,
+          "witnessed": true
+        },
+        "fuel_energy": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 12.0,
+          "sellers_accepted": [
+            "station_a",
+            "station_b",
+            "station_c"
+          ],
+          "sellers_carried_by_hub": [
+            "station_b"
+          ],
+          "sellers_dropped": [],
+          "unit": "local currency per litre of premium unleaded",
+          "unit_price": 3.307,
+          "value": 39.684,
+          "witnessed": true
+        },
+        "insurance": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 0.0328767123,
+          "sellers_accepted": [
+            "insurer_a",
+            "insurer_b",
+            "insurer_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per month for the canonical insured",
+          "unit_price": 2548.09,
+          "value": 83.7728218445,
+          "witnessed": true
+        },
+        "travel": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "operator_a",
+            "operator_b",
+            "operator_c",
+            "operator_d"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the fixed routes, cabins and hotel class table",
+          "unit_price": 223.21,
+          "value": 223.21,
+          "witnessed": true
+        },
+        "vehicle": {
+          "carried_days": 0,
+          "class": "rulebook",
+          "quantity_per_day": 0.000913242,
+          "sellers_accepted": [
+            "maker"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency list price of the named premium trim",
+          "unit_price": 125527.0,
+          "value": 114.636528534,
+          "witnessed": true
+        }
+      },
+      "move": 0.0056105198,
+      "move_confirmed": false,
+      "move_confirmed_ex": false,
+      "move_ex": 0.0053148233,
+      "move_limit_carried": false,
+      "move_limit_carried_ex": false,
+      "name": "Paris",
+      "qualification": {
+        "test_1_residents": "not run in this pass",
+        "test_2_open_records": "not run in this pass",
+        "test_3_reconciles": true,
+        "test_4_all_lines": true
+      },
+      "seller_drops": [],
+      "tax": {
+        "annual_spending": 443818.7161101939,
+        "effective_rate": 0.5219380165,
+        "gross_income": 928370.653664887,
+        "income_tax_annual": 394499.9841491992,
+        "income_tax_per_day": 1327.5395549444,
+        "schedule_status": "placeholder: shape of the French schedule; to be read from the statute pages",
+        "social_annual": 90051.953405494
+      },
+      "trim_mark": "trimmed_high"
+    },
+    "singapore": {
+      "B": 214050.0,
+      "B_linked": 214050.0,
+      "C": 2446.0485795823,
+      "C_ex": 1912.0875432647,
+      "R": 0.0114274636,
+      "R_ex": 0.0089329014,
+      "R_ex_fresh": 0.0089329014,
+      "R_ex_linked": 0.0089329014,
+      "R_fresh": 0.0114274636,
+      "R_linked": 0.0114274636,
+      "S": 1912.0875432647,
+      "basket_carried_days": 0,
+      "basket_items": {
+        "car_trim": 197392.0,
+        "jeans": 140,
+        "laptop": 2999,
+        "phone": 1799,
+        "shoes": 220,
+        "watch": 11500
+      },
+      "carried_lines": [],
+      "city_carried_days": 0,
+      "clip": 518.8939068722,
+      "continent": "Asia",
+      "country": "SG",
+      "currency": "SGD",
+      "excluded": false,
+      "flags": [
+        "home clipped at the cap: 518.8939068722 per day clipped"
+      ],
+      "home": {
+        "cap": 382.4175086529,
+        "cap_share": 0.2,
+        "carried_days": 0,
+        "clip": 518.8939068722,
+        "daily_cost": 382.4175086529,
+        "daily_cost_unclipped": 901.3114155251,
+        "divergence": 0.0416604001,
+        "duplicates": 0,
+        "home_insurance_per_day": 37.9506849315,
+        "keyed_listings": 0,
+        "listings": 11,
+        "median_asking": 6926000.0,
+        "min_listings": 10,
+        "min_platforms": 3,
+        "platform_ids": [
+          "platform_a",
+          "platform_b",
+          "platform_c"
+        ],
+        "platforms": 3,
+        "price_per_day": 632.5114155251,
+        "property_charge_per_day": 41.095890411,
+        "reason": null,
+        "reconciled": true,
+        "record_median": 6649000.0,
+        "rejected": 0,
+        "unique_listings": 11,
+        "upkeep_per_day": 189.7534246575,
+        "witnessed": true
+      },
+      "included": false,
+      "included_ex": false,
+      "income_tax_per_day": 533.9610363176,
+      "lines": {
+        "everything_else": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "retailer_a",
+            "retailer_b",
+            "retailer_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the named specifications and quantities",
+          "unit_price": 596.27,
+          "value": 596.27,
+          "witnessed": true
+        },
+        "food": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "chain_a",
+            "chain_b",
+            "chain_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the catalog's named food specifications (organic and premium lines, dining out)",
+          "unit_price": 208.0,
+          "value": 208.0,
+          "witnessed": true
+        },
+        "fuel_energy": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 12.0,
+          "sellers_accepted": [
+            "station_a",
+            "station_b",
+            "station_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per litre of premium unleaded",
+          "unit_price": 5.2,
+          "value": 62.4,
+          "witnessed": true
+        },
+        "insurance": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 0.0328767123,
+          "sellers_accepted": [
+            "insurer_a",
+            "insurer_b",
+            "insurer_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per month for the canonical insured",
+          "unit_price": 4006.89,
+          "value": 131.7333697477,
+          "witnessed": true
+        },
+        "travel": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "operator_a",
+            "operator_b",
+            "operator_c",
+            "operator_d"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the fixed routes, cabins and hotel class table",
+          "unit_price": 351.0,
+          "value": 351.0,
+          "witnessed": true
+        },
+        "vehicle": {
+          "carried_days": 0,
+          "class": "rulebook",
+          "quantity_per_day": 0.000913242,
+          "sellers_accepted": [
+            "maker"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency list price of the named premium trim",
+          "unit_price": 197392.0,
+          "value": 180.266664864,
+          "witnessed": true
+        }
+      },
+      "move": 0.0054030352,
+      "move_confirmed": false,
+      "move_confirmed_ex": false,
+      "move_ex": 0.0053217019,
+      "move_limit_carried": false,
+      "move_limit_carried_ex": false,
+      "name": "Singapore",
+      "qualification": {
+        "test_1_residents": "not run in this pass",
+        "test_2_open_records": "not run in this pass",
+        "test_3_reconciles": true,
+        "test_4_all_lines": true
+      },
+      "seller_drops": [],
+      "tax": {
+        "annual_spending": 697911.9532916095,
+        "effective_rate": 0.2182953523,
+        "gross_income": 892807.7315475447,
+        "income_tax_annual": 174495.7782559353,
+        "income_tax_per_day": 533.9610363176,
+        "schedule_status": "placeholder: shape of the Singapore schedule; to be read from the statute pages",
+        "social_annual": 20400.0
+      },
+      "trim_mark": "trimmed_low"
+    },
+    "sydney": {
+      "B": 226401.0,
+      "B_linked": 226401.0,
+      "C": 3628.472684125,
+      "C_ex": 2015.863125326,
+      "R": 0.016026752,
+      "R_ex": 0.0089039497,
+      "R_ex_fresh": 0.0089039497,
+      "R_ex_linked": 0.0089039497,
+      "R_fresh": 0.016026752,
+      "R_linked": 0.016026752,
+      "S": 2015.863125326,
+      "basket_carried_days": 0,
+      "basket_items": {
+        "car_trim": 208213.0,
+        "jeans": 150,
+        "laptop": 3299,
+        "phone": 1999,
+        "shoes": 240,
+        "watch": 12500
+      },
+      "carried_lines": [
+        "insurance"
+      ],
+      "city_carried_days": 0,
+      "clip": 547.6072836106,
+      "continent": "Oceania",
+      "country": "AU",
+      "currency": "AUD",
+      "excluded": false,
+      "flags": [
+        "line insurance unwitnessed (2 accepted sellers): carried 1 day(s)",
+        "home clipped at the cap: 547.6072836106 per day clipped"
+      ],
+      "home": {
+        "cap": 403.1726250652,
+        "cap_share": 0.2,
+        "carried_days": 0,
+        "clip": 547.6072836106,
+        "daily_cost": 403.1726250652,
+        "daily_cost_unclipped": 950.7799086758,
+        "divergence": 0.0417295813,
+        "duplicates": 0,
+        "home_insurance_per_day": 41.5835616438,
+        "keyed_listings": 0,
+        "listings": 11,
+        "median_asking": 7589000.0,
+        "min_listings": 10,
+        "min_platforms": 3,
+        "platform_ids": [
+          "platform_a",
+          "platform_b",
+          "platform_c"
+        ],
+        "platforms": 3,
+        "price_per_day": 693.0593607306,
+        "property_charge_per_day": 8.2191780822,
+        "reason": null,
+        "reconciled": true,
+        "record_median": 7285000.0,
+        "rejected": 0,
+        "unique_listings": 11,
+        "upkeep_per_day": 207.9178082192,
+        "witnessed": true
+      },
+      "included": true,
+      "included_ex": true,
+      "income_tax_per_day": 1612.609558799,
+      "lines": {
+        "everything_else": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "retailer_a",
+            "retailer_b",
+            "retailer_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the named specifications and quantities",
+          "unit_price": 628.96,
+          "value": 628.96,
+          "witnessed": true
+        },
+        "food": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "chain_a",
+            "chain_b",
+            "chain_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the catalog's named food specifications (organic and premium lines, dining out)",
+          "unit_price": 219.4,
+          "value": 219.4,
+          "witnessed": true
+        },
+        "fuel_energy": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 12.0,
+          "sellers_accepted": [
+            "station_a",
+            "station_b",
+            "station_c"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per litre of premium unleaded",
+          "unit_price": 5.485,
+          "value": 65.82,
+          "witnessed": true
+        },
+        "insurance": {
+          "carried_days": 1,
+          "class": "market",
+          "quantity_per_day": 0.0328767123,
+          "sellers_accepted": [
+            "insurer_a",
+            "insurer_b"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per month for the canonical insured",
+          "unit_price": 4201.2,
+          "value": 138.1216437148,
+          "witnessed": false
+        },
+        "travel": {
+          "carried_days": 0,
+          "class": "market",
+          "quantity_per_day": 1.0,
+          "sellers_accepted": [
+            "operator_a",
+            "operator_b",
+            "operator_c",
+            "operator_d"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency per day of the fixed routes, cabins and hotel class table",
+          "unit_price": 370.24,
+          "value": 370.24,
+          "witnessed": true
+        },
+        "vehicle": {
+          "carried_days": 0,
+          "class": "rulebook",
+          "quantity_per_day": 0.000913242,
+          "sellers_accepted": [
+            "maker"
+          ],
+          "sellers_carried_by_hub": [],
+          "sellers_dropped": [],
+          "unit": "local currency list price of the named premium trim",
+          "unit_price": 208213.0,
+          "value": 190.148856546,
+          "witnessed": true
+        }
+      },
+      "move": 0.005034079,
+      "move_confirmed": false,
+      "move_confirmed_ex": false,
+      "move_ex": 0.0048012869,
+      "move_limit_carried": false,
+      "move_limit_carried_ex": false,
+      "name": "Sydney",
+      "qualification": {
+        "test_1_residents": "not run in this pass",
+        "test_2_open_records": "not run in this pass",
+        "test_3_reconciles": true,
+        "test_4_all_lines": true
+      },
+      "seller_drops": [],
+      "tax": {
+        "annual_spending": 735790.0407439717,
+        "effective_rate": 0.4444320515,
+        "gross_income": 1324392.5297056069,
+        "income_tax_annual": 562114.6383675231,
+        "income_tax_per_day": 1612.609558799,
+        "schedule_status": "placeholder: shape of the Australian schedule; to be read from the statute pages",
+        "social_annual": 26487.8505941121
+      },
+      "trim_mark": "included"
+    }
+  },
+  "reference_rates": {
+    "source": "placeholder",
+    "usd_per_unit": {
+      "AUD": 0.67,
+      "BTC": 83000.0,
+      "EUR": 1.1,
+      "GBP": 1.3,
+      "SGD": 0.75,
+      "USD": 1.0
+    }
+  },
+  "rulebook": {
+    "canonical_taxpayer": {
+      "deductions": "standard only",
+      "income_rule": "spending subtotal grossed up through the statutory schedule",
+      "status": "single resident adult"
+    },
+    "carry_forward_limit_days": 7,
+    "catalog_notice_days": 90,
+    "daily_move_limit": 0.05,
+    "home_cap_share": 0.2,
+    "home_min_listings": 10,
+    "home_min_platforms": 3,
+    "home_record_tolerance": 0.15,
+    "link_overlap_days": 90,
+    "max_seats": 10,
+    "max_seats_per_country": 2,
+    "min_cities": 5,
+    "min_countries": 3,
+    "min_sellers": 3,
+    "seller_tolerance": 0.25,
+    "trim_share": 0.2
+  },
+  "rulebook_hash": "dd31f751328f8e32b287d0e862b0d52ad10576c42f800f10f65a0bfa81e3e520",
+  "status": "fixed",
+  "trim": {
+    "dropped_each_end": 1,
+    "included_cities": [
+      "london",
+      "sydney",
+      "milan"
+    ],
+    "included_cities_ex": [
+      "london",
+      "paris",
+      "sydney"
+    ],
+    "min_cities": 5,
+    "n": 5,
+    "trim_share": 0.2,
+    "trimmed_high": [
+      "paris"
+    ],
+    "trimmed_low": [
+      "singapore"
+    ]
+  },
+  "version": "lu-fix/0.9"
+}
+/* PLACEHOLDER_FIX_END */;
+</script>
+<script>
+(function () {
+  "use strict";
+
+  var fix = PLACEHOLDER_FIX;
+  var fixSource = "embedded in this page";
+
+  function el(id) { return document.getElementById(id); }
+  function setText(id, s) { el(id).textContent = s; }
+  function clear(node) { while (node.firstChild) { node.removeChild(node.firstChild); } }
+  function cell(tag, text, cls) {
+    var c = document.createElement(tag);
+    c.textContent = text;
+    if (cls) { c.className = cls; }
+    return c;
+  }
+  function str(x) { return x === undefined || x === null ? "(none)" : String(x); }
+
+  function fiatCurrencies() {
+    return LU.quoteCurrencies(fix).filter(function (c) { return c !== "BTC" && c !== "SAT"; });
+  }
+
+  function fillSelect(id, values, keep) {
+    var sel = el(id);
+    var current = keep && sel.value ? sel.value : null;
+    clear(sel);
+    values.forEach(function (v) {
+      var o = document.createElement("option");
+      o.value = v;
+      o.textContent = v;
+      sel.appendChild(o);
+    });
+    if (current && values.indexOf(current) >= 0) {
+      sel.value = current;
+    }
+  }
+
+  function coinPrice() {
+    var p = Number(el("coin-price").value);
+    if (isFinite(p) && p > 0) {
+      return { price: p, currency: el("coin-currency").value };
+    }
+    return null;
+  }
+
+  function renderFix() {
+    var banner = el("placeholder-banner");
+    if (LU.isPlaceholder(fix)) {
+      banner.hidden = false;
+      banner.textContent = "Placeholder data: nothing here was witnessed, and no number on this page is a real quote.";
+    } else {
+      banner.hidden = true;
+    }
+    /* The summary sits with the file picker, not above the quote, so the
+       quote card is on the first phone screen (review round 2); the
+       status and the catalog version are in the work list. */
+    setText("fix-summary", "Fix of " + str(fix.date) + (LU.isPlaceholder(fix) ? " (placeholder)" : "") + ", " + fixSource + ". One Life Unit = " + LU.fixedString(LU.luOf(fix), 6) + " baskets.");
+  }
+
+  function renderQuote() {
+    /* The field's text, not Number(): lu.js maps an empty field to NaN,
+       so a cleared field shows the prompt and not "0.000000 LU". */
+    var amount = el("amount").value;
+    var X = el("currency").value;
+    var q = LU.quote(fix, amount, X, { coinPrice: coinPrice() });
+    var have = isFinite(q.lu_days);
+    var luText = "";
+    if (have) {
+      /* A satoshi quote is about 3e-9 LU and would read 0.000000; the
+         engine prints the exponent form beside the six decimals
+         (lucalc/quote.py), so the headline uses it below 5e-7, and
+         thousands separators above (review round 2). */
+      luText = (q.lu_days !== 0 && Math.abs(q.lu_days) < 5e-7) ? q.lu_days.toExponential(2) : LU.withCommas(q.lu_days, 6);
+    }
+    setText("result-lu", have ? luText + " LU" : "");
+    setText("result-time", have ? q.time + " of abundant life" : "enter an amount and pick a currency");
+    var note = "";
+    if (have) {
+      /* A BTC amount is usually under 0.005, so two decimals would show
+         it as 0.00; eight decimals with the trailing zeros stripped. */
+      var amountDecimals = X === "BTC" ? 8 : (X === "SAT" ? 0 : 2);
+      var shown = LU.withCommas(q.amount, amountDecimals);
+      if (X === "BTC") {
+        shown = shown.replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1");
+      }
+      note = shown + " " + X;
+      if (q.via !== X) {
+        note += " = " + LU.withCommas(q.price_via, 2) + " " + q.via;
+      }
+      note += ", through B_" + q.via + " = " + LU.withCommas(q.b_x, q.via === "BTC" ? 8 : (q.via === "SAT" ? 0 : 2)) + " " + q.via + " and LU = " + LU.fixedString(q.lu, 6) + " baskets.";
+      if (q.notes.length) {
+        note += " " + q.notes.join(". ") + ".";
+      }
+    }
+    setText("result-note", note);
+  }
+
+  function renderEveryday() {
+    var body = el("everyday-table").querySelector("tbody");
+    clear(body);
+    LU.everydayItems(fix).forEach(function (it) {
+      var tr = document.createElement("tr");
+      tr.appendChild(cell("td", it.label));
+      tr.appendChild(cell("td", LU.withCommas(it.usd, 2), "num"));
+      tr.appendChild(cell("td", it.lu_text, "num"));
+      /* A duration breaks between its unit pairs, never inside one: "3
+         minutes" and "13 seconds" each stay on one line, so the cell is
+         two lines at 320px and wider (review round 3). */
+      var td = document.createElement("td");
+      var words = it.time.split(" ");
+      for (var i = 0; i < words.length; i += 2) {
+        if (i) {
+          td.appendChild(document.createTextNode(" "));
+        }
+        var pair = document.createElement("span");
+        pair.style.whiteSpace = "nowrap";
+        pair.textContent = words.slice(i, i + 2).join(" ");
+        td.appendChild(pair);
+      }
+      tr.appendChild(td);
+      body.appendChild(tr);
+    });
+  }
+
+  /* The verify report: one block per line (the .report CSS gives each a
+     hanging indent). */
+  function setReport(out, text, cls) {
+    clear(out);
+    String(text).split("\n").forEach(function (line) {
+      out.appendChild(cell("div", line));
+    });
+    out.className = "report" + (cls ? " " + cls : "");
+  }
+
+  function reportLines(out) {
+    var lines = [];
+    for (var i = 0; i < out.childNodes.length; i++) {
+      lines.push(out.childNodes[i].textContent);
+    }
+    return lines;
+  }
+
+  function luCities(f) {
+    var kept = LU.readings(f).filter(function (r) { return r.included === true; }).map(function (r) { return r.city; });
+    return kept.length ? kept.join(", ") : "(none marked)";
+  }
+
+  function sha256Hex(text) {
+    if (!(window.crypto && window.crypto.subtle && typeof TextEncoder === "function")) {
+      return Promise.reject(new Error("no crypto.subtle in this browser"));
+    }
+    return window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then(function (buf) {
+      var bytes = new Uint8Array(buf);
+      var hex = "";
+      for (var i = 0; i < bytes.length; i++) {
+        hex += ("0" + bytes[i].toString(16)).slice(-2);
+      }
+      return hex;
+    });
+  }
+
+  function renderWork() {
+    var X = el("currency").value;
+    var bx = LU.basketPriceIn(fix, X);
+    var pubBx = LU.publishedBasketPrice(fix, X);
+    var rr = fix.reference_rates || {};
+    var cov = fix.coverage || {};
+    var rows = [
+      ["LU (Daily Fixed, baskets)", LU.fixedString(LU.luOf(fix), 10)],
+      ["LU without income tax", LU.fixedString(Number(fix.lu_ex_income_tax), 10)],
+      ["Cumulative chain factor", String(LU.cumulativeFactorOf(fix))],
+      ["Basket chain factor", String(LU.basketFactorOf(fix)) + " (B_linked = B times it; the quoting basket's own chain)"],
+      ["Base period", str(LU.basePeriodOf(fix))],
+      ["Status", str(fix.status)],
+      ["Trim share / min cities", LU.trimShareOf(fix) + " / " + LU.minCitiesOf(fix)],
+      ["B_" + X + " (basket in " + X + ")", (isFinite(pubBx) ? LU.fixedString(pubBx, X === "BTC" ? 10 : 6) + " published; Verify recomputes it" : LU.fixedString(bx.value, X === "BTC" ? 10 : 6) + " recomputed") + (bx.kept_cities ? "; trim by basket price keeps " + bx.kept_cities.join(", ") : "")],
+      ["B_X trim", "B_X trims by basket price and may keep different cities from the LU trim; both sets are published (cities in the LU trim: " + luCities(fix) + ")"],
+      ["Satoshis per Life Unit", LU.withCommas(LU.satoshisPerLifeUnit(fix), 0)],
+      ["One Bitcoin in Life Units", LU.fixedString(LU.bitcoinInLifeUnits(fix), 6)],
+      ["Reference rates", str(rr.source) + " " + JSON.stringify(LU.referenceRates(fix))],
+      ["Coverage", "fresh " + str(cov.fresh_share) + ", carried " + str(cov.carried_share) + (cov.flags && cov.flags.length ? "; " + cov.flags.join("; ") : "")],
+      ["Catalog version", str(fix.catalog_version)],
+      ["Catalog hash", str(fix.catalog_hash)],
+      ["Inputs hash", str(fix.inputs_hash)],
+      ["Rulebook hash", str(fix.rulebook_hash)],
+      ["Fix hash", str(fix.fix_hash)],
+      ["Code version", str(fix.code_version)],
+      ["Fix version", str(fix.version)]
+    ];
+    var dl = el("work-list");
+    clear(dl);
+    rows.forEach(function (r) {
+      dl.appendChild(cell("dt", r[0]));
+      dl.appendChild(cell("dd", r[1]));
+    });
+
+    var body = el("readings-table").querySelector("tbody");
+    clear(body);
+    LU.readings(fix).forEach(function (r) {
+      var tr = document.createElement("tr");
+      tr.appendChild(cell("td", r.name || r.city));
+      tr.appendChild(cell("td", r.currency));
+      /* The trim mark is the table's point, so it is the third column
+         and in the first slice of the sideways scroller on a phone
+         (review round 4). */
+      var mark = r.excluded ? "excluded" : (r.included === true ? "included" : (r.included === false ? "trimmed" : "unknown"));
+      tr.appendChild(cell("td", mark, r.included === true ? "mark-in" : "mark-out"));
+      tr.appendChild(cell("td", LU.withCommas(r.S, 2), "num"));
+      tr.appendChild(cell("td", LU.withCommas(r.income_tax_per_day, 2), "num"));
+      tr.appendChild(cell("td", LU.withCommas(r.C, 2), "num"));
+      tr.appendChild(cell("td", LU.withCommas(isFinite(r.B_raw) ? r.B_raw : r.B, 2), "num"));
+      tr.appendChild(cell("td", LU.fixedString(r.R, 8), "num"));
+      tr.appendChild(cell("td", isFinite(r.clip) && r.clip > 0 ? LU.withCommas(r.clip, 2) : "0"));
+      var notes = [];
+      if (r.flags.length) { notes.push(r.flags.join("; ")); }
+      if (r.carried_lines.length) { notes.push("carried: " + r.carried_lines.join(", ")); }
+      if (r.seller_drops.length) {
+        notes.push("seller drops: " + r.seller_drops.map(function (d) {
+          return typeof d === "string" ? d : (str(d.line) + " " + str(d.seller));
+        }).join(", "));
+      }
+      tr.appendChild(cell("td", notes.length ? notes.join(" | ") : ""));
+      body.appendChild(tr);
+    });
+    var out = el("verify-output");
+    out.hidden = true;
+    clear(out);
+    out.className = "report";
+  }
+
+  function renderAll() {
+    renderFix();
+    var firstRender = el("currency").options.length === 0;
+    fillSelect("currency", LU.quoteCurrencies(fix), true);
+    if (firstRender && LU.quoteCurrencies(fix).indexOf("BTC") >= 0) {
+      el("currency").value = "BTC";
+    }
+    fillSelect("coin-currency", fiatCurrencies(), true);
+    renderQuote();
+    renderEveryday();
+    renderWork();
+    setText("footer-version", "lu.js " + LU.VERSION + ". No network calls unless the live-price button is pressed.");
+  }
+
+  el("amount").addEventListener("input", renderQuote);
+  /* The prefilled amount is selected on focus, deferred one tick so iOS
+     Safari keeps the selection, so a phone quote is tap, type, pick a
+     currency and never a delete first (review round 3). select() works
+     on type="number" where setSelectionRange does not. */
+  el("amount").addEventListener("focus", function () {
+    var field = this;
+    setTimeout(function () { field.select(); }, 0);
+  });
+  el("currency").addEventListener("change", function () { renderQuote(); renderWork(); });
+  el("coin-price").addEventListener("input", renderQuote);
+  el("coin-currency").addEventListener("change", renderQuote);
+  el("clear-coin").addEventListener("click", function () {
+    el("coin-price").value = "";
+    setText("live-status", "");
+    renderQuote();
+  });
+
+  el("verify").addEventListener("click", function () {
+    var result = LU.verify(fix, 1e-9);
+    var out = el("verify-output");
+    out.hidden = false;
+    var cls = result.ok ? "ok" : "fail";
+    setReport(out, LU.formatVerify(result), cls);
+    /* The fix hash: SHA-256 over the canonical form of everything but
+       fix_hash (methodology 8.5; lu.js canonical). Needs crypto.subtle. */
+    var body;
+    try {
+      body = LU.fixHashBody(fix);
+    } catch (e) {
+      out.appendChild(cell("div", "fix_hash not checked: " + e.message));
+      return;
+    }
+    sha256Hex(body).then(function (hex) {
+      /* The verdict is the first line, so a failed hash rewrites it and
+         the hash line sits right under it, not at the end of the report. */
+      var same = typeof fix.fix_hash === "string" && hex === fix.fix_hash.toLowerCase();
+      var line = (same ? "  ok   " : "  FAIL ") + "fix_hash: published " + str(fix.fix_hash) + ", recomputed " + hex + (same ? "" : " (differs)");
+      var lines = reportLines(out);
+      if (!same) {
+        lines[0] = result.ok
+          ? "DIFFERS: the fix hash does not match the canonical form of this fix"
+          : lines[0] + "; and the fix hash does not match";
+        cls = "fail";
+      }
+      /* Under the two parameter lines, so it heads the check list; on
+         success it joins the verdict's count (review round 2). */
+      lines.splice(3, 0, line);
+      if (same) {
+        lines[0] = lines[0].replace(/all (\d+) agree/, function (whole, n) { return "all " + (Number(n) + 1) + " agree"; });
+      }
+      setReport(out, lines.join("\n"), cls);
+    }).catch(function (e) {
+      out.appendChild(cell("div", "fix_hash not checked: " + (e && e.message ? e.message : "no SHA-256 available")));
+    });
+  });
+
+  el("fix-file").addEventListener("change", function (ev) {
+    var file = ev.target.files && ev.target.files[0];
+    if (!file) { return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        /* An integer above 2^53 is named before JSON.parse rounds it,
+           as the engine refuses one (review round 4). */
+        LU.checkIntegerLiterals(String(reader.result));
+        var parsed = JSON.parse(String(reader.result));
+        if (typeof parsed !== "object" || parsed === null || !isFinite(Number(parsed.lu)) || LU.readings(parsed).length === 0) {
+          throw new Error("not a fix: needs a numeric lu and readings");
+        }
+        fix = parsed;
+        fixSource = "from " + file.name;
+        setText("fix-load-status", "Loaded " + file.name + " (" + file.size + " bytes).");
+        renderAll();
+      } catch (e) {
+        setText("fix-load-status", "Could not load " + file.name + ": " + e.message + ". The previous fix stays loaded.");
+      }
+    };
+    reader.onerror = function () {
+      setText("fix-load-status", "Could not read " + file.name + ". The previous fix stays loaded.");
+    };
+    reader.readAsText(file);
+  });
+
+  el("fetch-live").addEventListener("click", function () {
+    var cur = String(el("coin-currency").value || "USD").toLowerCase();
+    if (typeof fetch !== "function") {
+      setText("live-status", "This browser cannot fetch. Enter a price by hand.");
+      return;
+    }
+    setText("live-status", "Fetching from api.coingecko.com ...");
+    var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 8000) : null;
+    var url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=" + encodeURIComponent(cur);
+    fetch(url, ctrl ? { signal: ctrl.signal } : {})
+      .then(function (resp) {
+        if (!resp.ok) { throw new Error("HTTP " + resp.status); }
+        return resp.json();
+      })
+      .then(function (data) {
+        var p = data && data.bitcoin && data.bitcoin[cur];
+        if (typeof p !== "number" || !(p > 0)) { throw new Error("no price in the reply"); }
+        el("coin-price").value = String(p);
+        setText("live-status", "CoinGecko: 1 BTC = " + LU.withCommas(p, 2) + " " + cur.toUpperCase() + " at " + new Date().toISOString() + ". An aggregator reading for convenience, not a Daily Fixed quote.");
+        renderQuote();
+      })
+      .catch(function (e) {
+        var why = e && e.name === "AbortError" ? "timed out" : ((e && e.message) || "offline or blocked");
+        setText("live-status", "Could not fetch a live price (" + why + "). Enter a price by hand, or leave the field empty to use the fix's reference rate.");
+      })
+      .then(function () { if (timer) { clearTimeout(timer); } });
+  });
+
+  if (!fix || typeof fix !== "object") {
+    setText("fix-summary", "No fix is embedded in this page. Load one with the file picker.");
+    setText("result-lu", "n/a");
+  } else {
+    renderAll();
+  }
+})();
+</script>
+</body>
+</html>
