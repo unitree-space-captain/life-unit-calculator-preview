@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Life Unit World Clock</title>
+<meta name="description" content="A ticking clock of the world measured in Life Units: one Life Unit is one day in the life every human deserves. Working placeholder figures, clearly tagged.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a clock board. Grouped panels of live counters, each with what it is based on; milestones, sources and a scenario calculator below. Deliberately one dark look, like a station departure board. */
+:root {
+  --ground: #0d1b20; --panel: #13262c; --panel-2: #183038; --ink: #e6efec; --ink-soft: #9cb3b0; --line: #24414a;
+  --sun: #e8b04e; --leaf: #5fc39a; --ember: #e6784a; --sky: #6aa8ea; --clay: #f2a27f; --lilac: #cfa6ee;
+  --display: "Young Serif", Georgia, "Times New Roman", serif;
+  --body: "Figtree", "Helvetica Neue", Arial, sans-serif;
+  --data: "JetBrains Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 32px 56px; display: grid; gap: 30px; }
+h1, h2 { font-family: var(--display); font-weight: 400; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.9rem); line-height: 1.1; }
+h2 { font-size: 1.3rem; }
+p { margin: 0; max-width: 72ch; }
+.muted { color: var(--ink-soft); }
+.eyebrow { font: 600 0.72rem/1 var(--body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--sun); }
+header { display: grid; gap: 10px; }
+.topline { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; }
+.status { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.84rem; color: var(--ink-soft); align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+.pill.version { font-size: 0.78rem; color: var(--ink-soft); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-soft); }
+.pill.live .dot { background: var(--leaf); box-shadow: 0 0 0 3px rgba(95, 195, 154, 0.18); }
+.pill.stale .dot { background: var(--ember); }
+
+.group { display: grid; gap: 12px; }
+.group-head { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 10px; }
+.cell { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 14px 12px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.cell.hero { grid-column: span 2; background: var(--panel-2); }
+@media (max-width: 560px) { .cell.hero { grid-column: span 1; } }
+.label { font-size: 0.86rem; color: var(--ink); font-weight: 500; }
+.label.step { margin-top: 8px; }
+.num { font: 500 1.45rem/1.15 var(--data); font-variant-numeric: tabular-nums; color: var(--sun); overflow-wrap: anywhere; }
+.hero .num { font-size: clamp(1.7rem, 4vw, 2.4rem); }
+.num.down { color: var(--ember); }
+.num.up { color: var(--leaf); }
+.num.blue { color: var(--sky); }
+.num.lilac { color: var(--lilac); }
+.unit { font: 0.8rem var(--body); color: var(--ink-soft); }
+.basis { font-size: 0.76rem; color: var(--ink-soft); border-top: 1px dashed var(--line); padding-top: 6px; }
+.tag { display: inline-block; font: 600 0.64rem/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 6px; border-radius: 4px; margin-right: 6px; vertical-align: 1px; }
+.tag.real { background: rgba(95, 195, 154, 0.16); color: var(--leaf); }
+.tag.est { background: rgba(232, 176, 78, 0.16); color: var(--sun); }
+.tag.ph { background: rgba(242, 162, 127, 0.16); color: var(--clay); }
+.tag.demo { background: rgba(207, 166, 238, 0.16); color: var(--lilac); }
+.tag.model { background: rgba(106, 168, 234, 0.16); color: var(--sky); }
+
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+table { width: 100%; border-collapse: collapse; min-width: 640px; }
+th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+th { font: 600 0.7rem/1.2 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+tr:last-child td { border-bottom: 0; }
+td.d { font-family: var(--data); }
+td.gold { color: var(--sun); font-family: var(--data); }
+td.wrapcell { white-space: normal; min-width: 220px; }
+td.rulecell { white-space: normal; min-width: 220px; }
+td .sub { display: block; font: 0.74rem var(--body); color: var(--ink-soft); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 0.8rem; color: var(--ink-soft); }
+.chart-legend { margin: 0 8px 8px; }
+.c-sun { color: var(--sun); } .c-sky { color: var(--sky); } .c-leaf { color: var(--leaf); }
+.notice { background: var(--panel-2); border: 1px solid var(--sun); border-radius: 8px; padding: 12px 16px; font-size: 0.9rem; max-width: none; }
+.notice.demo { border-color: var(--lilac); }
+.chart { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 10px 8px; position: relative; min-width: 0; }
+.chart h3 { font: 600 0.92rem var(--body); margin: 0 8px 6px; color: var(--ink); }
+.chart svg { display: block; width: 100%; height: auto; }
+.chart text { fill: var(--ink-soft); font: 12px var(--body); }
+.ctip { position: absolute; pointer-events: none; background: var(--ink); color: var(--ground); font: 0.82rem/1.4 var(--body); padding: 6px 9px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 10px; }
+.calc { display: grid; gap: 10px; }
+.wrap > *, .group > *, .calc > *, .board > *, .charts > * { min-width: 0; }
+.formula { font: 500 0.95rem/1.6 var(--data); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; color: var(--ink); overflow-x: auto; }
+.formula b { color: var(--sun); font-weight: 600; }
+details.part { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+details.part summary { cursor: pointer; display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; font-weight: 600; color: var(--ink); }
+details.part summary .amt { font-family: var(--data); color: var(--sun); white-space: nowrap; }
+details.part .inner { padding: 0 16px 12px; }
+details.part table { min-width: 560px; }
+details.part td.why { white-space: normal; color: var(--ink-soft); font-size: 0.8rem; text-align: left; }
+.totalrow td { font-weight: 600; color: var(--ink); border-top: 1px solid var(--sun); }
+details.src { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 16px; }
+details.src summary { cursor: pointer; font-weight: 600; padding: 10px 0; color: var(--ink); }
+details.src[open] summary { border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+details.src p { margin: 6px 0 10px; font-size: 0.9rem; color: var(--ink-soft); }
+details.src strong { color: var(--ink); }
+footer { display: grid; gap: 8px; font-size: 0.82rem; color: var(--ink-soft); border-top: 1px solid var(--line); padding-top: 16px; }
+footer .prov { font-size: 0.76rem; }
+@media (prefers-reduced-motion: reduce) { .pill.live .dot { box-shadow: none; } }
+.lifebars { display: grid; gap: 4px; padding: 4px 8px; }
+.lb { display: grid; grid-template-columns: minmax(0, 18em) minmax(0, 1fr) 7.5em; gap: 10px; align-items: center; font-size: 0.8rem; }
+.lb .n { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb .t { height: 10px; background: var(--panel-2); border-radius: 3px; position: relative; }
+.lb .f { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--sun); }
+.lb.mkt .f { background: var(--sky); } .lb.pay .f { background: var(--leaf); }
+.lb .v { font-family: var(--data); color: var(--ink-soft); text-align: right; white-space: nowrap; }
+.lbaxis { display: flex; justify-content: space-between; margin: 6px 8px 0 calc(18em + 26px); margin-right: calc(7.5em + 18px); font-size: 0.72rem; color: var(--ink-soft); }
+@media (max-width: 560px) { .lb { grid-template-columns: minmax(0, 1fr) 7em; gap: 2px 8px; margin-bottom: 4px; } .lb .n { grid-column: 1 / -1; } .lbaxis { margin-left: 8px; margin-right: calc(7em + 16px); } .lbaxis span:nth-child(even) { display: none; } }
+.tagline { font-family: var(--display); font-size: clamp(1.15rem, 2.6vw, 1.5rem); color: var(--sun); margin: 0; }
+
+/* Try ur own numbers: scenario calculator */
+.trygrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 10px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.panel.result { background: var(--panel-2); }
+.panel h3 { margin: 0; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 10px 14px; }
+.field { display: grid; gap: 4px; align-content: start; min-width: 0; }
+.field label { font-size: 0.84rem; font-weight: 500; color: var(--ink); }
+.inp { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; background: var(--ground); min-width: 0; }
+.inp:focus-within { border-color: var(--sun); }
+.inp:has(input[aria-invalid="true"]) { border-color: var(--ember); }
+.inp input { flex: 1; min-width: 0; width: 100%; border: 0; background: none; color: var(--ink); font: 500 0.95rem var(--data); padding: 8px 10px; }
+.inp span { font-size: 0.74rem; color: var(--ink-soft); padding-right: 10px; white-space: nowrap; }
+.hint { font-size: 0.76rem; color: var(--ink-soft); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { font: 600 0.84rem var(--body); border: 1px solid var(--sun); background: var(--sun); color: var(--ground); border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:focus-visible, .inp input:focus-visible, summary:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; }
+.err { color: var(--ember); font-size: 0.82rem; min-height: 1.2em; max-width: none; }
+.big { font: 500 clamp(1.6rem, 5vw, 2.3rem)/1.15 var(--data); color: var(--sun); overflow-wrap: anywhere; display: block; }
+.eqn { font: 0.8rem/1.6 var(--data); color: var(--ink-soft); background: var(--ground); border-radius: 6px; padding: 8px 10px; overflow-wrap: anywhere; max-width: none; }
+dl.acct { margin: 0; display: grid; gap: 6px; }
+dl.acct div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+dl.acct dt { font-size: 0.84rem; color: var(--ink-soft); min-width: 0; }
+dl.acct dd { margin: 0; font: 500 0.92rem var(--data); white-space: nowrap; }
+dl.acct .total { border-bottom-color: var(--sun); }
+dl.acct .total dt, dl.acct .total dd { color: var(--sun); font-weight: 600; }
+@media (max-width: 560px) { dl.acct div { flex-wrap: wrap; gap: 2px 12px; } }
+noscript p { margin: 16px; padding: 12px; border: 1px solid var(--ember); }
+</style>
+</head>
+<body>
+<noscript><p>This clock needs JavaScript to tick and to calculate. Its explanations are still readable below.</p></noscript>
+<main class="wrap">
+  <header>
+    <div class="topline"><span class="eyebrow">The Life Unit Standard · live</span><span class="pill version">v1.0 (merged), 15 October 2026</span></div>
+    <h1>Life Unit World Clock</h1>
+    <p class="tagline">Life is the way it can be measured in units. Life Units.</p>
+    <p class="muted">One Life Unit (LU) is one day in the life every human deserves, costing about USD 2,692 today across the ten most expensive places to live. That dollar figure is a working placeholder until real prices are collected in each place. A Life Unit is not for sale; it is only a standard of measure.</p>
+    <p class="muted">Every number below moves continuously from the rates we measured or assumed: semi-real time, not live trading. Each number carries a tag that says how solid it is.</p>
+    <div class="status">
+      <span class="pill" id="feedPill"><span class="dot"></span><span id="feedText">Connecting to the price feed</span></span>
+      <span class="pill"><span id="nowText">…</span></span>
+    </div>
+    <div class="legend">
+      <span><span class="tag real">Real</span>measured data</span>
+      <span><span class="tag est">Estimate</span>real figures or rules, approximate timing</span>
+      <span><span class="tag ph">Placeholder</span>uses the working Life Unit figure or reference prices, until real city prices arrive</span>
+      <span><span class="tag demo">Demo</span>shows how a planned feature will work; not a real rate</span>
+      <span><span class="tag model">Model</span>an illustration from the long-range model</span>
+    </div>
+  </header>
+
+  <section class="group" aria-labelledby="g-life">
+    <div class="group-head"><span class="eyebrow">Humanity</span><h2 id="g-life">The human family, right now</h2></div>
+    <div class="board" id="b-life"></div>
+  </section>
+
+  <section class="group" aria-labelledby="g-dollar">
+    <div class="group-head"><span class="eyebrow">The dollar</span><h2 id="g-dollar">What the dollar is doing to life value</h2></div>
+    <div class="board" id="b-dollar"></div>
+  </section>
+
+  <section class="group" aria-labelledby="g-life-prices">
+    <div class="group-head"><span class="eyebrow">Life Units in everyday life</span><h2 id="g-life-prices">What things cost in life, not dollars</h2></div>
+    <p class="muted">This is the dollar turned around. Instead of asking what a Life Unit is worth in dollars, every number here asks what an ordinary thing costs in Life Units, and what share of one abundant day it takes. If the world priced in Life Units, a price tag would read like this.</p>
+    <p class="notice"><strong>Read these as worked examples.</strong> The dollar prices are approximate US averages and approximate market reference levels, not live quotes (gold uses the live price feed). Every Life Unit number here is divided by the working placeholder figure, so all of them are tagged Placeholder. They move slowly at each item's usual yearly pace, and the last digits move every moment with the instant Life Unit value, whose swing is a simulated demonstration of currency movement. A live market and price-node feed would replace every one of them.</p>
+    <div class="board" id="b-basket"></div>
+    <h3 class="label">At the store and at home</h3>
+    <div class="board" id="b-store"></div>
+    <h3 class="label">Markets and futures: oil, cattle, coffee, grain, metals, stocks</h3>
+    <div class="board" id="b-mkt"></div>
+    <h3 class="label">Work and pay: how much life an hour of work earns</h3>
+    <div class="board" id="b-pay"></div>
+    <div class="chart">
+      <h3>Everything above, measured in time of an abundant day</h3>
+      <div class="legend chart-legend"><span class="c-sun">■ store and home</span><span class="c-sky">■ markets and futures</span><span class="c-leaf">■ what work earns</span><span>bar length on a time scale; number in Life Units (placeholder)</span></div>
+      <div class="lifebars" id="lifeBars"></div>
+      <div class="lbaxis"><span>1 second</span><span>1 minute</span><span>1 hour</span><span>1 day</span><span>1 month</span><span>1 year</span></div>
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="g-fix">
+    <div class="group-head"><span class="eyebrow">Official and instant</span><h2 id="g-fix">The daily fixed figure and the live feed</h2></div>
+    <p class="notice demo"><strong>DEMONSTRATION, not a real rate.</strong> No official Life Unit figure has been released yet. Every dollar amount in this section is the working placeholder figure plus a simulated currency swing (the same for every viewer). It is here only to show how the official figure and the two feeds will work together.</p>
+    <p class="muted">When the standard is live, contracts will use only the official Daily Fixed figure: published once a day for everyone at the same moment, averaged over the 15:00 to 16:00 UTC window so nobody can push it at a single instant, and shown with the times of the observations behind it. Paying subscribers never receive it early. Businesses will be able to pay for the instant indicative value, which updates every few seconds; the public will see it free on a 15-minute delay. A Settled figure is recomputed later, when late data arrives, for research and records; if it shows a Daily Fixed figure was off, the correction is published openly and is never pushed into future figures.</p>
+    <div class="board" id="b-fix"></div>
+  </section>
+
+  <section class="group" aria-labelledby="g-calc">
+    <div class="group-head"><span class="eyebrow">The calculation</span><h2 id="g-calc">How one Life Unit is calculated, line by line</h2></div>
+    <p class="notice"><strong>Read this as a worked example.</strong> The structure below is the real method. The prices in it are placeholders, chosen so the total matches today's working figure of about USD 1,750 a day in spending, until data-farming nodes collect real prices in each of the ten places. Each line says where its real number will come from. Tap any part to see its lines.</p>
+    <p class="muted">How it will become real: Light sets the quantities first (how much food, which home, which vehicle, how many trips), then the same quantities are priced in every place, the way official price indexes work. Spending, each part and tax are published separately. Light's USD 1,500 to 2,000 a day of spending is a sanity check, not a target: once real prices arrive, the total is whatever they add up to, and the balancing "Saving for the future" line is replaced by an amount Light sets.</p>
+    <div class="formula">One Life Unit = <b>median-six average</b> of the ten places' daily cost, where each place's daily cost = (home + food + vehicle + fuel and energy + travel + insurance + everything else) ÷ (1 − that place's tax rate)</div>
+    <div class="calc" id="calcParts"></div>
+    <div class="formula" id="calcTotal"></div>
+    <h3 class="label step">Step 2: the ten places</h3>
+    <p class="muted">Each place gets its own daily cost from its own prices and its own taxes. The two highest and two lowest daily costs are dropped and the middle six averaged, once, on the complete city totals, so one city's bubble or crash barely moves the unit. Today all ten carry the same placeholder figure, so the trim changes nothing yet: it will matter once real city costs arrive. Until then, ties are broken by place name (A to Z), only so that everyone sees the same table. The one-year change column comes from the proxy backtest: how each place's cost of living moved over the past year (real local home and consumer price indices, converted at real exchange rates).</p>
+    <p class="muted">The list is the Julius Baer Global Wealth and Lifestyle Report 2026 top ten, used as the starting point. The rule gives every inhabited continent a seat, with at most two places per country; this list still lacks the Americas and Africa, which the rule must correct.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Place</th><th>Continent</th><th>Daily cost today (placeholder)</th><th>Change over the past year</th><th>Used in the average?</th></tr></thead>
+      <tbody id="placeRows"></tbody>
+    </table></div>
+    <p class="muted" id="trimLine"></p>
+  </section>
+
+  <section class="group" aria-labelledby="g-src">
+    <div class="group-head"><span class="eyebrow">Where the numbers come from</span><h2 id="g-src">How the Life Unit's value is measured, and how fresh it is</h2></div>
+    <p class="notice"><strong>Semi-real time, not live trading.</strong> The counters tick every tenth of a second, but they tick from fixed rates, not live market data. Coin prices come from a shared price feed that is refreshed by hand for now (about daily; the last refresh time is shown at the top). The cost of a Life Unit changes slowly because homes, insurance, food and taxes are re-priced monthly or quarterly. The official figure will be fixed once a day.</p>
+    <div class="charts">
+      <div class="chart" id="chartLU"><h3>Cost of one Life Unit in dollars, quarterly, 2016 to 2026 (proxy backtest of real city price indices, scaled to the 8 Oct 2026 placeholder figure)</h3></div>
+      <div class="chart" id="chartBTC"><h3>One Bitcoin in Life Units, quarterly, 2016 to 2026 (real Bitcoin prices divided by the proxy backtest, scaled to the 8 Oct 2026 placeholder figure)</h3></div>
+    </div>
+    <p class="muted">How to read the two charts: the movement comes from real home-price, consumer-price and exchange-rate indices for the ten places, used as a stand-in for real abundant-life prices. The dollar level is scaled so that 2026 Q3 equals the placeholder figure, so the level itself is not measured. The test is exploratory: the median-six trim was chosen using this same data, so it still needs checking on data it was not chosen with.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Feed refresh</th><th>Bitcoin price</th><th>One Life Unit (placeholder)</th><th>Bitcoin in Life Units</th></tr></thead>
+      <tbody id="feedRows"><tr><td colspan="4" class="muted">Each time the price feed is refreshed, a dated reading is added here.</td></tr></tbody>
+    </table></div>
+    <details class="src">
+      <summary>Where every number comes from (tap to open)</summary>
+      <p><span class="tag real">Real</span><strong>Coin prices:</strong> CoinGecko, a public market-data service that averages prices across many exchanges. Copied into this page's shared feed at each refresh; not a live trading price. The official standard will use hour-averaged prices weighted by real trading volume across many exchanges.</p>
+      <p><span class="tag est">Estimate</span><strong>The two history charts:</strong> a proxy backtest. Its inputs are real: home prices (Bank for International Settlements), consumer prices (World Bank), exchange rates (US Federal Reserve) and Bitcoin (Coinbase), all via the St. Louis Fed (FRED), quarterly since 2016. Its dollar level is scaled to the placeholder figure, and the trim rule was chosen on the same data.</p>
+      <p><span class="tag ph">Placeholder</span><strong>Today's cost of a Life Unit:</strong> USD 2,692.31 on 8 October 2026 from the v0.3 abundant-day costs, which are working placeholders until real prices are collected in the ten places. Between data updates it rises at 2.6% a year, the average pace of the proxy backtest.</p>
+      <p><span class="tag est">Estimate</span><strong>Population, debt and world output:</strong> UN, IIF and IMF figures, advanced at their published yearly rates.</p>
+      <p><span class="tag est">Estimate</span><strong>The basic-day floor:</strong> about USD 9.84 a day for healthy food, safe water, shelter, energy and care (from SOFI 2026, Rao and Min 2018, and Kikstra et al. 2021). It is a red line on the measuring stick, not something coins buy, and it still has to be calibrated to each region's purchasing power.</p>
+      <p><span class="tag model">Planned</span><strong>When the standard is live:</strong> independent data-farming nodes gather sale prices, insurance, fuel, food and tax data in the ten places for the quantities Light has fixed; verifier nodes recompute the figure; the middle six places are averaged; the official figure is fixed once a day over a one-hour window and recorded on a blockchain. Missing or stale data is never filled in silently: it is shown with its age. Businesses can receive an instant value every few seconds; the public sees it free on a short delay.</p>
+      <p><strong>How often each part changes:</strong> coin prices, seconds (refreshed here about daily); fuel and travel, daily; food, weekly to monthly; homes, insurance and vehicles, monthly to quarterly; taxes, yearly.</p>
+    </details>
+  </section>
+
+  <section class="group" aria-labelledby="g-coins">
+    <div class="group-head"><span class="eyebrow">Coins</span><h2 id="g-coins">Coins measured in life, and their supply clocks</h2></div>
+    <p class="muted">Bitcoin first. Each coin's dollar price is real (from the shared feed, dated at the top of the page). Its Life Units divide that price by the working placeholder figure, so they are placeholders until real city prices arrive. The dollar cancels out: any currency gives the same Life Unit answer.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Asset</th><th>Life Units per coin (placeholder)</th><th>In plain time</th><th>Bridge price</th><th>Coins in existence</th><th>Supply rule</th></tr></thead>
+      <tbody id="coinRows"></tbody>
+    </table></div>
+    <div class="board" id="b-coins"></div>
+  </section>
+
+  <section class="group" aria-labelledby="g-road">
+    <div class="group-head"><span class="eyebrow">The road ahead</span><h2 id="g-road">Milestones, counting down</h2></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Milestone</th><th>Expected</th><th>Time remaining</th><th>Based on</th></tr></thead>
+      <tbody id="roadRows"></tbody>
+    </table></div>
+  </section>
+
+  <section class="group" id="try" aria-labelledby="g-try">
+    <div class="group-head"><span class="eyebrow">Scenarios</span><h2 id="g-try">Try ur own numbers</h2></div>
+    <p class="notice"><strong>These are scenarios, not official figures.</strong> Change any number to see what it means in Life Units. The arithmetic happens in this browser; nothing typed here is saved or sent anywhere, and reloading the page brings back the defaults.</p>
+    <div class="trygrid">
+      <form class="panel" id="convForm" novalidate>
+        <h3 class="label">Turn any dollar amount into Life Units</h3>
+        <div class="fields">
+          <div class="field"><label for="convAmount">Dollar amount</label><div class="inp"><input id="convAmount" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="24" value="10,000" aria-describedby="convAmountHint"><span>USD</span></div><span class="hint" id="convAmountHint">A price, a paycheck, savings, or the price of one coin.</span></div>
+          <div class="field"><label for="convLU">Value of one Life Unit</label><div class="inp"><input id="convLU" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="24" value="2,692.31" aria-describedby="convLUHint"><span>USD per LU</span></div><span class="hint" id="convLUHint">Default: the working placeholder figure of 8 October 2026. Edit it, or use a button below.</span></div>
+        </div>
+        <div class="actions"><button type="button" class="btn" id="useClock">Use the clock's figure right now</button><button type="button" class="btn ghost" id="useBudget">Use my budget result below</button><button type="reset" class="btn ghost">Back to the defaults</button></div>
+        <p class="err" id="convErr" role="status"></p>
+      </form>
+      <div class="panel result" aria-live="polite" aria-atomic="true">
+        <span class="hint">In Life Units (scenario)</span>
+        <output class="big" id="convOut" for="convAmount convLU">Calculating</output>
+        <p class="muted" id="convTime"></p>
+        <p class="eqn" id="convEq">Dollar amount ÷ value of one Life Unit</p>
+      </div>
+    </div>
+    <div class="trygrid">
+      <form class="panel" id="budgetForm" novalidate>
+        <h3 class="label">Build an abundant-day budget</h3>
+        <p class="hint">The defaults are the placeholder lines from the calculation above (including its balancing saving line), so they add up to today's working figure. Amounts are a year unless marked. A year is 365.25 days, the same as the rest of the page.</p>
+        <div class="fields">
+          <div class="field"><label for="bLivingIn">Living spending, a year</label><div class="inp"><input id="bLivingIn" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="24" value="306,223.75"><span>USD</span></div><span class="hint">Food, fuel and energy, travel, health and insurance, and everything else.</span></div>
+          <div class="field"><label for="bHomePrice">Home sale price</label><div class="inp"><input id="bHomePrice" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="24" value="4,500,000"><span>USD</span></div><span class="hint">Valued by ownership, with no mortgage, because central banks set interest rates.</span></div>
+          <div class="field"><label for="bHomeYears">Years to spread the home price over</label><div class="inp"><input id="bHomeYears" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="24" value="30"><span>years</span></div></div>
+          <div class="field"><label for="bHomeRun">Home upkeep, property tax and insurance</label><div class="inp"><input id="bHomeRun" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="24" value="1.95"><span>% of price a year</span></div></div>
+          <div class="field"><label for="bVehPrice">Vehicle price</label><div class="inp"><input id="bVehPrice" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="24" value="150,000"><span>USD</span></div><span class="hint">Any vehicle up to a top-trim full-size truck.</span></div>
+          <div class="field"><label for="bVehYears">Years before the vehicle is replaced</label><div class="inp"><input id="bVehYears" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="24" value="3"><span>years</span></div><span class="hint">Never older than three years.</span></div>
+          <div class="field"><label for="bVehResale">Trade-in value when replaced</label><div class="inp"><input id="bVehResale" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="24" value="55"><span>% of price</span></div><span class="hint">A three-year-old truck still has trade-in value. 55% is an assumption, not a guaranteed sale.</span></div>
+          <div class="field"><label for="bVehRun">Vehicle running costs, a year</label><div class="inp"><input id="bVehRun" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="24" value="25,060"><span>USD</span></div><span class="hint">Insurance, maintenance, registration and parking.</span></div>
+          <div class="field"><label for="bSave">Saving for the future, a year</label><div class="inp"><input id="bSave" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="24" value="47,653.75"><span>USD</span></div><span class="hint">Default: the balancing line from the calculation above.</span></div>
+          <div class="field"><label for="bTax">Tax rate on income</label><div class="inp"><input id="bTax" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="24" value="35"><span>%</span></div><span class="hint">A flat placeholder. Each place's own real tax schedule will replace it.</span></div>
+        </div>
+        <div class="actions"><button type="reset" class="btn ghost">Back to the defaults</button></div>
+        <p class="err" id="budgetErr" role="status"></p>
+      </form>
+      <div class="panel result" aria-live="polite" aria-atomic="true">
+        <span class="eyebrow">Scenario, USD a day</span>
+        <dl class="acct">
+          <div><dt>Living spending</dt><dd id="bLiving">…</dd></div>
+          <div><dt>Home: price spread over the years, plus upkeep, tax and insurance</dt><dd id="bHome">…</dd></div>
+          <div><dt>Vehicle: value lost by trade-in time, plus running costs</dt><dd id="bVehicle">…</dd></div>
+          <div><dt>Saving for the future</dt><dd id="bSaving">…</dd></div>
+          <div><dt>Spending before tax</dt><dd id="bNet">…</dd></div>
+          <div><dt>Tax on what it takes to fund that spending</dt><dd id="bTaxOut">…</dd></div>
+          <div class="total"><dt>One Life Unit in this scenario</dt><dd id="bGross">…</dd></div>
+        </dl>
+        <p class="hint" id="bDetail"></p>
+        <p class="eqn">Home = (price ÷ years + price × upkeep %) ÷ 365.25<br>Vehicle = (price × (1 − trade-in %) ÷ years + running costs) ÷ 365.25<br>One Life Unit = (living + home + vehicle + saving) ÷ (1 − tax rate)</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p><strong>How the clock works.</strong> Each counter starts from a measured or modeled value at a fixed reference moment and moves at a fixed rate per second, so every visitor sees the same numbers at the same time. Coin prices come from a shared price feed when it is available, otherwise from reference prices taken on 8 October 2026.</p>
+    <p><strong>Sources.</strong> Population and life expectancy: UN World Population Prospects 2024. World debt: Institute of International Finance, mid-2026 (USD 365.5 trillion, growing about USD 20 trillion a year). World output: IMF, April 2026 (about USD 125 trillion a year). Abundant-day cost and its 2.6% yearly rise: the Life Unit Standard methodology (from v0.4) and its 2016 to 2026 proxy backtest. Basic-day floor: SOFI 2026 (FAO, IFAD, UNICEF, WFP and WHO), Rao and Min (2018), Kikstra et al. (2021). Ten places: Julius Baer Global Wealth and Lifestyle Report 2026, as a starting reference. Coin supplies and rules: CoinGecko (8 October 2026) and each coin's published rules, as documented in the Life Unit Tokenomics Report. Adoption: the long-range model's illustrative S-curve.</p>
+    <p>Real figures are measured; estimates follow real figures or rules with approximate timing; placeholders use the working Life Unit figure or reference prices until real city prices are collected; demos show how a planned feature will work and are not real rates; model figures are illustrations, not forecasts. Not financial advice.</p>
+    <p><strong>Authorship.</strong> Life Units and the abundant-day idea come from Evan Sanders (Light), Founding Concept Notes, 7 October 2026. Named by Light, 8 October 2026; tagline chosen by Light, 9 October 2026.</p>
+    <p class="prov">v1.0 (merged), 15 October 2026. Built by Claude on 15 October 2026 from Light's version (v0.8 era, 7 to 10 October 2026, prepared with Claude) plus selected fixes from ChatGPT/Codex drafts of 14 to 15 October 2026 (archived), at Light's instruction.</p>
+  </footer>
+</main>
+
+<script>
+/* Pure arithmetic for the Life Unit World Clock. No page access, no network. Also loaded by test_calculator.cjs. */
+(function (root) {
+  "use strict";
+  var DAYS_PER_YEAR = 365.25, MAX = 1e12;
+  var DECIMAL = /^(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+)$/;
+
+  function plain(n) { return n >= 1e12 ? "1 trillion" : n.toLocaleString("en-US", { maximumFractionDigits: 6 }); }
+
+  // Reads one number. Accepts a number, or a plain decimal string with optional thousands commas ("4,500,000", "1.95").
+  // Rejects empty text, negatives, hex, exponents and anything outside [min, max], with a plain-English message.
+  function readNumber(value, label, min, max) {
+    var n;
+    if (typeof value === "number") {
+      n = value;
+    } else if (typeof value === "string") {
+      var s = value.trim();
+      if (s === "") throw new Error(label + " is empty. Enter a number.");
+      if (s.charAt(0) === "-") throw new Error(label + " cannot be negative.");
+      if (!DECIMAL.test(s)) throw new Error(label + " must be a plain number, like 1,250.50.");
+      n = Number(s.replace(/,/g, ""));
+    } else {
+      throw new Error(label + " must be a number.");
+    }
+    if (!isFinite(n)) throw new Error(label + " must be a number.");
+    if (n < min || n > max) throw new Error(label + " must be between " + plain(min) + " and " + plain(max) + ".");
+    return n;
+  }
+
+  function readAll(rules, input) {
+    var values = {}, errors = {};
+    Object.keys(rules).forEach(function (k) {
+      var r = rules[k];
+      try { values[k] = readNumber(input[k], r[0], r[1], r[2]); } catch (e) { errors[k] = e.message; }
+    });
+    var bad = Object.keys(errors);
+    if (bad.length) {
+      var err = new Error(bad.map(function (k) { return errors[k]; }).join(" "));
+      err.fields = errors;
+      throw err;
+    }
+    return values;
+  }
+
+  var CONVERT_FIELDS = {
+    amount: ["The dollar amount", 0, MAX],
+    luValue: ["The value of one Life Unit", 0.01, MAX]
+  };
+  function convert(input) {
+    var v = readAll(CONVERT_FIELDS, input || {});
+    return { amount: v.amount, luValue: v.luValue, lifeUnits: v.amount / v.luValue };
+  }
+
+  var BUDGET_FIELDS = {
+    living: ["Living spending", 0, MAX],
+    homePrice: ["Home sale price", 0, MAX],
+    homeYears: ["Years to spread the home price over", 1, 100],
+    homeRunPct: ["Home upkeep, property tax and insurance", 0, 20],
+    vehPrice: ["Vehicle price", 0, MAX],
+    vehYears: ["Years before the vehicle is replaced", 0.25, 50],
+    vehResalePct: ["Trade-in value", 0, 100],
+    vehRun: ["Vehicle running costs", 0, MAX],
+    saving: ["Saving for the future", 0, MAX],
+    taxPct: ["Tax rate", 0, 95]
+  };
+  // Abundant-day budget. Yearly inputs, daily outputs. Home by ownership (price spread over years plus a yearly
+  // percentage for upkeep, property tax and insurance); vehicle by value lost after a trade-in credit plus running
+  // costs; everything grossed up for income tax: gross = net / (1 - tax rate).
+  function budget(input) {
+    var v = readAll(BUDGET_FIELDS, input || {}), Y = DAYS_PER_YEAR;
+    var homePriceShare = v.homePrice / v.homeYears / Y;
+    var homeRunning = v.homePrice * v.homeRunPct / 100 / Y;
+    var resaleCredit = v.vehPrice * v.vehResalePct / 100;
+    var vehicleValueLoss = (v.vehPrice - resaleCredit) / v.vehYears / Y;
+    var vehicleRunning = v.vehRun / Y;
+    var living = v.living / Y, saving = v.saving / Y;
+    var home = homePriceShare + homeRunning, vehicle = vehicleValueLoss + vehicleRunning;
+    var net = living + home + vehicle + saving;
+    var gross = net / (1 - v.taxPct / 100);
+    if (!(gross <= MAX)) throw new Error("This budget is above the supported limit of 1 trillion USD a day.");
+    return {
+      living: living, home: home, homePriceShare: homePriceShare, homeRunning: homeRunning,
+      vehicle: vehicle, vehicleValueLoss: vehicleValueLoss, vehicleRunning: vehicleRunning, resaleCredit: resaleCredit,
+      saving: saving, net: net, tax: gross - net, gross: gross, taxRate: v.taxPct / 100
+    };
+  }
+
+  // Median-six trimmed mean, applied once to complete city totals. The two lowest and two highest DAILY COSTS are
+  // dropped; ties are broken by place name (A to Z) so the result is the same for everyone.
+  function trimByDailyCost(places) {
+    if (!Array.isArray(places) || places.length !== 10) throw new Error("The median-six trim needs exactly ten places.");
+    places.forEach(function (p) {
+      if (!p || typeof p.name !== "string" || typeof p.cost !== "number" || !isFinite(p.cost) || p.cost <= 0) throw new Error("Every place needs a name and a positive daily cost.");
+    });
+    var ordered = places.slice().sort(function (a, b) { return (a.cost - b.cost) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0); });
+    var kept = ordered.slice(2, 8);
+    var mean = kept.reduce(function (s, p) { return s + p.cost; }, 0) / 6;
+    var names = function (arr) { return arr.map(function (p) { return p.name; }); };
+    return { ordered: names(ordered), lowest: names(ordered.slice(0, 2)), highest: names(ordered.slice(8)), kept: names(kept), mean: mean, allTied: ordered[0].cost === ordered[9].cost };
+  }
+
+  var api = Object.freeze({ version: "1.0-merged", daysPerYear: DAYS_PER_YEAR, readNumber: readNumber, convert: convert, budget: budget, trimByDailyCost: trimByDailyCost });
+  root.LifeUnitMath = api;
+  if (typeof module === "object" && module && module.exports) module.exports = api;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+</script>
+<script>
+(function () {
+  "use strict";
+  var M = window.LifeUnitMath;
+  var DAY = 86400, YEAR = 365.25 * DAY;
+  var T0 = Date.parse("2026-10-08T00:00:00Z") / 1000;
+  var LD0 = 2692.31, LD_RATE = 0.026, FLOOR = 9.84;
+  var POP_REF = { t: Date.parse("2026-07-01T00:00:00Z") / 1000, v: 8.30e9, g: 0.0083 };
+  var DEBT_REF = { t: Date.parse("2026-06-30T00:00:00Z") / 1000, v: 365.5e12, perYear: 20e12 };
+  var GDP_YEAR = 125e12, LIFE_EXP = 73.8;
+  var REF_PRICES = { bitcoin: { usd: 83135, xau: 20.07 }, ethereum: { usd: 2579.39 }, binancecoin: { usd: 773.36 }, ripple: { usd: 1.42 }, solana: { usd: 116.45 }, dogecoin: { usd: 0.089067 } };
+  var prices = REF_PRICES, feedAsOf = null;
+  var OPENED = Date.now() / 1000;
+  var TAGS = { real: "Real", est: "Estimate", ph: "Placeholder", demo: "Demo", model: "Model" };
+
+  var COINS = [
+    { id: "bitcoin", name: "Bitcoin", sym: "BTC", s0: 20095031, perSec: 3.125 / 600, rule: "3.125 BTC every 10 minutes; hard cap 21 million" },
+    { id: "ethereum", name: "Ether", sym: "ETH", s0: 122113301, perSec: 122113301 * 0.005 / YEAR, rule: "about 2,600 a day issued, minus the fee burn (net about +0.5% a year)" },
+    { id: "binancecoin", name: "BNB", sym: "BNB", s0: 133158884, perSec: -6.0e6 / YEAR, rule: "no new coins; about 1.5 million burned each quarter, until 100 million remain" },
+    { id: "ripple", name: "XRP", sym: "XRP", s0: 63092975951, perSec: 3.0e9 / YEAR, rule: "escrow releases add about 3 billion a year to circulation; 100 billion maximum" },
+    { id: "solana", name: "Solana", sym: "SOL", s0: 589094125, perSec: 589094125 * 0.0386 / YEAR, rule: "about 3.9% a year of new coins, falling 15% a year to 1.5%" },
+    { id: "dogecoin", name: "Dogecoin", sym: "DOGE", s0: 156232596384, perSec: 10000 / 60, rule: "10,000 new every minute, forever" }
+  ];
+  var ROAD = [
+    ["Next XRP escrow unlock (up to 1 billion)", "2026-11-01T00:00:00Z", "Ripple unlocks escrow on the first of each month", "est"],
+    ["Next Bitcoin halving (reward 3.125 to 1.5625)", "2028-04-18T00:00:00Z", "every 210,000 blocks; date estimated from block pace", "est"],
+    ["Next Zcash halving", "2028-11-23T00:00:00Z", "current Zcash rules (NU6.1)", "est"],
+    ["Solana inflation reaches its 1.5% floor", "2032-01-01T00:00:00Z", "current 15% yearly disinflation; an approved change could bring it to 2029", "est"],
+    ["BNB supply reaches 100 million", "2032-06-30T00:00:00Z", "about 6 million burned a year from 133 million", "est"],
+    ["XRP escrow fully released", "2037-06-30T00:00:00Z", "about 32 billion left, about 3 billion net a year", "est"],
+    ["Half the world prices in Life Units", "2046-01-01T00:00:00Z", "long-range model adoption S-curve", "model"],
+    ["End of the long-range model", "2051-10-08T00:00:00Z", "model horizon", "model"],
+    ["Last Bitcoin mined", "2140-01-01T00:00:00Z", "halvings every four years until the reward reaches zero", "est"]
+  ];
+
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function fmt(n, d) { return n.toLocaleString("en-US", { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); }
+  function tagEl(kind) { return el("span", "tag " + kind, TAGS[kind] || TAGS.model); }
+  function lifeText(days) {
+    if (days >= 365.25) return fmt(days / 365.25, 2) + " years";
+    if (days >= 30.44) return fmt(days / 30.44, 2) + " months";
+    if (days >= 1) return fmt(days, 2) + " days";
+    var h = days * 24; if (h >= 1) return fmt(h, 2) + " hours";
+    var m = h * 60; if (m >= 1) return fmt(m, 2) + " minutes";
+    return fmt(m * 60, 2) + " seconds";
+  }
+
+  // ---- Worked calculation of one Life Unit (placeholder prices, real structure) ----
+  var Y = 365.25;
+  var BUNDLE = [
+    { part: "Home (owned, not rented)", lines: [
+      ["Purchase price of a beautiful home, spread over 30 years", "USD 4,500,000 / 30 years / 365.25", 4500000 / 30 / Y, "Recorded sale prices from land registries (US deeds and MLS, UK Land Registry, French DVF, Singapore, Hong Kong, Monaco statistics office)"],
+      ["Upkeep and repairs", "1.0% of price a year", 4500000 * 0.010 / Y, "Contractor and maintenance price surveys"],
+      ["Property tax", "0.6% of price a year (local rate)", 4500000 * 0.006 / Y, "Each city's published property tax rate"],
+      ["Home insurance", "0.35% of price a year", 4500000 * 0.0035 / Y, "Insurer quotes collected by data-farming nodes"] ] },
+    { part: "Food (organic by choice, dining out freely)", lines: [
+      ["Organic grass-fed steak", "0.25 lb a day at USD 28 a lb", 0.25 * 28, "Grocery and butcher prices scraped daily"],
+      ["Organic fruit and vegetables", "1.5 lb a day at USD 6 a lb", 1.5 * 6, "Grocery prices scraped daily"],
+      ["Organic eggs, dairy and bread", "daily basket", 11, "Grocery prices scraped daily"],
+      ["Other groceries (pantry, seafood, snacks)", "daily basket", 33, "Grocery prices scraped daily"],
+      ["Dining out", "one restaurant meal a day", 80, "Restaurant menu prices"],
+      ["Coffee and drinks", "daily", 10, "Cafe menu prices"] ] },
+    { part: "Vehicle (any vehicle up to a top-trim truck, 3 years old or newer)", lines: [
+      ["Loss of value (USD 150,000 vehicle, 45% over 3 years)", "150,000 x 0.45 / 3 years / 365.25", 150000 * 0.45 / 3 / Y, "New and used vehicle listings"],
+      ["Vehicle insurance", "USD 6,000 a year", 6000 / Y, "Insurer quotes"],
+      ["Maintenance", "USD 3,000 a year", 3000 / Y, "Dealer service prices"],
+      ["Registration and vehicle taxes", "USD 2,500 a year", 2500 / Y, "Government fee schedules"],
+      ["Parking in a top city", "USD 1,130 a month", 1130 * 12 / Y, "Parking rates"] ] },
+    { part: "Fuel, energy and utilities", lines: [
+      ["Fuel to drive anywhere", "30 miles a day at 20 mpg, USD 5.00 a gallon", 30 / 20 * 5, "Official fuel price reports, daily"],
+      ["Home electricity", "40 kWh a day at USD 0.30", 40 * 0.30, "Utility tariffs"],
+      ["Gas, water, internet and phone", "daily", 25.5, "Utility and telecom price lists"] ] },
+    { part: "Travel and vacations", lines: [
+      ["International trips", "4 a year at USD 15,000 each", 4 * 15000 / Y, "Flight and hotel prices, scraped weekly"],
+      ["Weekend trips", "6 a year at USD 5,000 each", 6 * 5000 / Y, "Flight and hotel prices"],
+      ["Travel insurance", "USD 1,200 a year", 1200 / Y, "Insurer quotes"] ] },
+    { part: "Health, dental and life insurance", lines: [
+      ["Health insurance premium", "USD 1,800 a month", 1800 * 12 / Y, "Health insurer premium surveys"],
+      ["Dental insurance", "USD 100 a month", 100 * 12 / Y, "Insurer quotes"],
+      ["Life insurance", "USD 2,500 a year", 2500 / Y, "Insurer quotes"],
+      ["Out-of-pocket health costs", "USD 9,500 a year", 9500 / Y, "Health cost surveys"] ] },
+    { part: "Everything else", lines: [
+      ["Fine clothing", "USD 30,000 a year", 30000 / Y, "Retail prices"],
+      ["Learning and education", "USD 15,000 a year", 15000 / Y, "Course and tuition prices"],
+      ["Leisure, entertainment and fitness", "USD 36,000 a year", 36000 / Y, "Venue and membership prices"],
+      ["Technology", "USD 8,000 a year", 8000 / Y, "Retail prices"],
+      ["Giving", "USD 20,000 a year", 20000 / Y, "Set by the standard"] ] }
+  ];
+  var SPEND_TARGET = 1750, TAX_RATE = 0.35;
+  (function () {
+    var sumOthers = 0; BUNDLE.forEach(function (b) { b.lines.forEach(function (l) { sumOthers += l[2]; }); });
+    BUNDLE[6].lines.push(["Saving for the future (balancing line)", "the rest of the USD 1,750 a day working spending figure", SPEND_TARGET - sumOthers, "Set by Light; until then this line only balances the placeholder total"]);
+    var host = $("calcParts"), spend = 0;
+    BUNDLE.forEach(function (b, bi) {
+      var subtotal = b.lines.reduce(function (a, l) { return a + l[2]; }, 0); spend += subtotal;
+      var d = el("details", "part"); if (bi === 0) d.open = true;
+      var sm = el("summary"); sm.appendChild(el("span", null, (bi + 1) + ". " + b.part)); sm.appendChild(el("span", "amt", "$" + fmt(subtotal, 2) + " a day")); d.appendChild(sm);
+      var inner = el("div", "inner"), wrap = el("div", "scroll"), tb = el("table"), th = el("thead"), hr = el("tr");
+      ["Item", "How it is figured", "Per day (placeholder)", "Where the real number will come from"].forEach(function (h) { hr.appendChild(el("th", null, h)); });
+      th.appendChild(hr); tb.appendChild(th); var body = el("tbody");
+      b.lines.forEach(function (l) {
+        var tr = el("tr"); tr.appendChild(el("td", null, l[0])); tr.appendChild(el("td", "why", l[1]));
+        tr.appendChild(el("td", "d", "$" + fmt(l[2], 2))); tr.appendChild(el("td", "why", l[3])); body.appendChild(tr);
+      });
+      var t = el("tr", "totalrow"); t.appendChild(el("td", null, "Subtotal")); t.appendChild(el("td")); t.appendChild(el("td", "d", "$" + fmt(subtotal, 2))); t.appendChild(el("td")); body.appendChild(t);
+      tb.appendChild(body); wrap.appendChild(tb); inner.appendChild(wrap); d.appendChild(inner); host.appendChild(d);
+    });
+    var tax = spend * TAX_RATE / (1 - TAX_RATE), total = spend + tax;
+    var ct = $("calcTotal"); ct.textContent = "";
+    ct.appendChild(document.createTextNode("Spending $" + fmt(spend, 2) + " + taxes $" + fmt(tax, 2) + " (income tax at a flat 35% placeholder rate; each place's own real tax schedule will replace it) = "));
+    ct.appendChild(el("b", null, "$" + fmt(total, 2) + " = one Life Unit on 8 October 2026 (placeholder)"));
+    ct.appendChild(document.createTextNode(". Between data updates the clock carries it forward at 2.6% a year, the average pace of the 2016 to 2026 proxy backtest."));
+
+    // [place, continent, change over the past year in the proxy backtest, %]
+    var PLACES = [["Singapore","Asia",1.4],["Zurich","Europe",-0.7],["Monaco","Europe",-1.5],["Hong Kong","Asia",2.9],["London","Europe",1.9],["Shanghai","Asia",4.8],["Paris","Europe",-1.5],["Sydney","Oceania",12.1],["Milan","Europe",0.1],["Bangkok","Asia",-2.3]];
+    // Placeholder: every place carries the same working figure until nodes collect its own prices and taxes.
+    var trim = M.trimByDailyCost(PLACES.map(function (c) { return { name: c[0], cost: total }; }));
+    PLACES.forEach(function (c) {
+      var tr = el("tr"); tr.appendChild(el("td", null, c[0])); tr.appendChild(el("td", null, c[1]));
+      tr.appendChild(el("td", "d", "$" + fmt(total, 2)));
+      tr.appendChild(el("td", "d", (c[2] > 0 ? "+" : "") + c[2].toFixed(1) + "%"));
+      var low = trim.lowest.indexOf(c[0]) > -1, high = trim.highest.indexOf(c[0]) > -1, used;
+      if (low || high) used = trim.allTied ? "Dropped by tie-break (all ten equal today)" : low ? "Dropped (two lowest daily costs)" : "Dropped (two highest daily costs)";
+      else used = "Yes, middle six";
+      tr.appendChild(el("td", null, used));
+      $("placeRows").appendChild(tr);
+    });
+    $("trimLine").textContent = "Median-six average of the ten daily costs: $" + fmt(trim.mean, 2) + " (placeholder)." + (trim.allTied ? " Every place carries the same figure today, so the trim changes nothing until real city costs arrive." : "");
+  })();
+
+  // Values as functions of the current time t (seconds since epoch).
+  function ldUsd(t) { return LD0 * Math.pow(1 + LD_RATE, (t - T0) / YEAR); }
+  function pop(t) { return POP_REF.v * Math.pow(1 + POP_REF.g, (t - POP_REF.t) / YEAR); }
+  function debt(t) { return DEBT_REF.v + DEBT_REF.perYear * (t - DEBT_REF.t) / YEAR; }
+  function adopt(t) { var y = 1970 + t / YEAR; return 0.7 / (1 + Math.exp(-0.35 * (y - 2043))); }
+  function sinceMidnight(t) { return t - Math.floor(t / DAY) * DAY; }
+  function goldUsd() { var b = prices.bitcoin; return (typeof b.xau === "number" && isFinite(b.xau) && b.xau > 0) ? b.usd / b.xau : REF_PRICES.bitcoin.usd / REF_PRICES.bitcoin.xau; }
+
+  var cells = [];
+  function cell(board, opts) {
+    var c = el("div", "cell" + (opts.hero ? " hero" : ""));
+    c.appendChild(el("div", "label", opts.label));
+    var n = el("div", "num " + (opts.tone || "")); c.appendChild(n);
+    var u = null;
+    if (opts.unit) { u = el("div", "unit", opts.unit); c.appendChild(u); }
+    var b = el("div", "basis"); b.appendChild(tagEl(opts.kind));
+    b.appendChild(document.createTextNode(opts.basis)); c.appendChild(b);
+    $(board).appendChild(c);
+    cells.push({ node: n, f: opts.f });
+    return { num: n, unit: u };
+  }
+
+  cell("b-life", { hero: true, label: "People alive", kind: "est", f: function (t) { return fmt(pop(t), 0); }, unit: "growing by about 2 people a second", basis: "UN estimate of 8.30 billion on 1 July 2026, advanced at its 0.83% yearly growth." });
+  cell("b-life", { label: "Human days lived so far today", kind: "est", f: function (t) { return fmt(pop(t) * sinceMidnight(t) / DAY, 0); }, unit: "days, since midnight UTC", basis: "Everyone alive lives one day per day." });
+  cell("b-life", { label: "Abundant days the world can pay for today", kind: "ph", f: function (t) { return fmt(GDP_YEAR / 365.25 / ldUsd(t) * sinceMidnight(t) / DAY, 0); }, unit: "Life Units of output since midnight UTC", basis: "World output of about USD 125 trillion a year, divided by the working placeholder cost of an abundant day." });
+  cell("b-life", { label: "World output per person, as a share of an abundant day", kind: "ph", tone: "blue", f: function (t) { return fmt(GDP_YEAR / 365.25 / pop(t) / ldUsd(t) * 100, 3) + "%"; }, unit: "the gap that abundance must close", basis: "Output per person per day divided by one Life Unit (placeholder)." });
+  cell("b-life", { label: "Days in an average human lifetime", kind: "real", f: function () { return fmt(LIFE_EXP * 365.25, 0); }, unit: "73.8 years", basis: "UN World Population Prospects 2024, world average for 2026." });
+
+  cell("b-dollar", { hero: true, label: "Cost of one abundant day, in dollars", kind: "ph", f: function (t) { return "$" + fmt(ldUsd(t), 6); }, unit: "rising every second", basis: "USD 2,692.31 on 8 October 2026 (working placeholder), rising 2.6% a year, the average pace of the 2016 to 2026 proxy backtest." });
+  cell("b-dollar", { label: "What USD 10,000 buys in abundant days", kind: "ph", tone: "down", f: function (t) { return fmt(10000 / ldUsd(t), 8); }, unit: "Life Units, shrinking every second", basis: "USD 10,000 divided by the cost of one abundant day." });
+  cell("b-dollar", { label: "Life value USD 10,000 has lost since you opened this page", kind: "ph", tone: "down", f: function (t) { return fmt((10000 / ldUsd(OPENED) - 10000 / ldUsd(t)) * DAY * 1000, 3); }, unit: "milliseconds of abundant life", basis: "The same shrinkage, counted from the moment this page opened." });
+  cell("b-dollar", { label: "World debt", kind: "est", f: function (t) { return "$" + fmt(debt(t), 0); }, unit: "growing by about USD 634,000 a second", basis: "USD 365.5 trillion at mid-2026 (IIF), growing about USD 20 trillion a year." });
+  cell("b-dollar", { label: "World debt in abundant days", kind: "ph", f: function (t) { return fmt(debt(t) / ldUsd(t), 0); }, unit: "Life Units", basis: "World debt divided by the cost of one abundant day." });
+  cell("b-dollar", { label: "World debt per person", kind: "ph", f: function (t) { return fmt(debt(t) / pop(t) / ldUsd(t), 4) + " days"; }, unit: "of abundant life, or about 12 years at the basic floor", basis: "World debt per person divided by one Life Unit." });
+  cell("b-dollar", { label: "Share of world pricing in Life Units", kind: "model", tone: "blue", f: function (t) { return fmt(adopt(t) * 100, 6) + "%"; }, unit: "illustrative S-curve: about 6% in 2036, half by 2046", basis: "Long-range model adoption path; not a forecast." });
+
+  cell("b-coins", { label: "One Life Unit, in satoshis", kind: "ph", f: function (t) { return fmt(ldUsd(t) / prices.bitcoin.usd * 1e8, 0); }, unit: "sats (100 million sats = 1 Bitcoin)", basis: "Working placeholder cost of an abundant day divided by the Bitcoin price from the feed." });
+  cell("b-coins", { label: "The basic-day floor, in satoshis", kind: "est", f: function () { return fmt(FLOOR / prices.bitcoin.usd * 1e8, 0); }, unit: "sats for a day of basic needs", basis: "About USD 9.84: healthy food, water, shelter, energy and care. Still to be calibrated to each region's purchasing power." });
+  cell("b-coins", { label: "Bitcoin mined since 8 October 2026", kind: "est", tone: "up", f: function (t) { return fmt((t - T0) * 3.125 / 600, 4); }, unit: "BTC, about 450 a day", basis: "3.125 BTC per block, one block about every 10 minutes." });
+  cell("b-coins", { label: "Bitcoin left to mine, ever", kind: "est", f: function (t) { return fmt(21e6 - COINS[0].s0 - (t - T0) * COINS[0].perSec, 2); }, unit: "BTC", basis: "21 million cap minus coins already created." });
+
+  // Demonstration of the official fix and the instant feed. The intraday movement is a simulated currency swing, the same for every viewer; the level is the placeholder figure.
+  var FIX_START = 15 * 3600, FIX_END = 16 * 3600;
+  function fxDemo(t) { return 0.0015 * Math.sin(t / 1800) + 0.0008 * Math.sin(t / 437 + 1) + 0.0004 * Math.sin(t / 97 + 2); }
+  function instant(t) { return ldUsd(t) * (1 + fxDemo(t)); }
+  function dayStart(t) { return Math.floor(t / DAY) * DAY; }
+  function fixFor(day0) { var sum = 0; for (var m = 0; m <= 60; m++) sum += instant(day0 + FIX_START + m * 60); return sum / 61; }
+  function lastFix(t) { var d = dayStart(t); return sinceMidnight(t) >= FIX_END ? { v: fixFor(d), at: d + FIX_END } : { v: fixFor(d - DAY), at: d - DAY + FIX_END }; }
+  function hms(sec) { sec = Math.max(0, Math.floor(sec)); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60; return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m + ":" + (x < 10 ? "0" : "") + x; }
+  cell("b-fix", { hero: true, label: "Demonstration: how the official Daily Fixed figure will be produced", kind: "demo", tone: "lilac", f: function (t) { return "$" + fmt(lastFix(t).v, 2); }, unit: "one abundant day, fixed once a day and never changed afterward (when the standard is live)", basis: "Demo: the average of the demo instant value over the 15:00 to 16:00 UTC window. The swing is simulated and the level is the working placeholder, so this is not a real rate. When live, the window will average many sources weighted by real trading." });
+  cell("b-fix", { label: "Fixing window", kind: "demo", tone: "blue", f: function (t) { var x = sinceMidnight(t); if (x >= FIX_START && x < FIX_END) return "Open: " + fmt((x - FIX_START) / 36, 0) + "% averaged"; var next = x < FIX_START ? FIX_START - x : DAY - x + FIX_START; return "Opens in " + hms(next); }, unit: "15:00 to 16:00 UTC every day", basis: "A full hour of averaging makes it very costly to push the figure at one moment." });
+  cell("b-fix", { label: "Instant indicative value (paid feed), demo", kind: "demo", tone: "lilac", f: function (t) { return "$" + fmt(instant(t), 4); }, unit: "updates every few seconds; never used to settle contracts", basis: "Demo: the movement shown is a simulated currency swing, the same for every viewer; the real feed would use live exchange rates." });
+  cell("b-fix", { label: "Free public feed (15-minute delay), demo", kind: "demo", tone: "lilac", f: function (t) { return "$" + fmt(instant(t - 900), 4); }, unit: "the instant value as it was 15 minutes ago", basis: "Same as the paid feed, delayed, like free stock quotes." });
+  cell("b-fix", { label: "One Bitcoin, instant reading, demo", kind: "demo", tone: "lilac", f: function (t) { return fmt(prices.bitcoin.usd / instant(t), 4) + " days"; }, unit: "Bitcoin price from the shared feed, divided by the demo instant value", basis: "Indicative only; contracts will use the Daily Fixed figure and hour-averaged prices from many exchanges." });
+
+  // ---- Everyday life priced in Life Units (approximate US prices and market reference levels) ----
+  // [name, usd on 8 Oct 2026, usual yearly change, note]
+  var STORE = [
+    ["A dozen eggs", 3.60, 0.03, "US average, large grade A"],
+    ["A gallon of gas", 3.15, 0.02, "US average, regular"],
+    ["A month's rent on a USD 3,000 home", 3000, 0, "a home that rents for USD 3,000 a month"],
+    ["A gallon of milk", 4.10, 0.025, "US average, whole milk"],
+    ["A loaf of bread", 2.10, 0.025, "US average, white bread"],
+    ["A pound of ground beef", 6.40, 0.04, "US average, 100% beef"],
+    ["A cup of coffee at a cafe", 5.50, 0.035, "typical US cafe"],
+    ["A fast-food meal", 11, 0.04, "burger, fries and a drink"],
+    ["Dinner for two at a restaurant", 85, 0.035, "sit-down, with tip"],
+    ["A week of groceries for a family of four", 310, 0.03, "moderate-cost plan, about the USDA level"],
+    ["A month of electricity", 180, 0.03, "average US household"],
+    ["A month of phone service", 85, 0.01, "one line, unlimited"],
+    ["A month of home internet", 75, 0.02, "typical broadband"],
+    ["A streaming subscription for a month", 18, 0.05, "one service, no ads"],
+    ["A movie ticket", 12, 0.03, "US average"],
+    ["A doctor visit without insurance", 180, 0.04, "basic office visit"],
+    ["A month of health insurance", 650, 0.06, "one adult, unsubsidized"],
+    ["A month of full-time childcare", 1300, 0.05, "US average, one child"],
+    ["A new car", 49500, 0.02, "US average transaction price"],
+    ["A home at the US median price", 420000, 0.035, "existing single-family home"]
+  ];
+  var MKT = [
+    ["A barrel of crude oil", 62, 0, "WTI futures, reference level"],
+    ["Natural gas, one million BTU", 3.30, 0, "Henry Hub futures, reference level"],
+    ["An ounce of gold", -1, 0, "from the live price feed"],
+    ["An ounce of silver", 48, 0, "spot, reference level"],
+    ["100 pounds of live cattle", 230, 0, "CME live cattle futures, reference level"],
+    ["A pound of coffee beans (arabica)", 3.80, 0, "ICE coffee futures, reference level"],
+    ["A bushel of wheat", 5.30, 0, "CBOT wheat futures, reference level"],
+    ["A bushel of corn", 4.20, 0, "CBOT corn futures, reference level"],
+    ["A pound of sugar", 0.17, 0, "ICE raw sugar futures, reference level"],
+    ["A pound of copper", 4.90, 0, "COMEX copper futures, reference level"],
+    ["1,000 board feet of lumber", 600, 0, "lumber futures, reference level"],
+    ["One share of an S&P 500 index fund", 670, 0.07, "about one tenth of the index, reference level"]
+  ];
+  var PAY = [
+    ["One hour at the US federal minimum wage", 7.25, 0, "USD 7.25 an hour, unchanged since 2009"],
+    ["One hour at the US median wage", 30.50, 0.035, "about the BLS median"],
+    ["A year of US median household income", 83700, 0.035, "about the Census median"],
+    ["A month of average Social Security retirement pay", 2000, 0.028, "about the SSA average"]
+  ];
+  function itemUsd(it, t) { return it[1] < 0 ? goldUsd() : it[1] * Math.pow(1 + it[2], (t - T0) / YEAR); }
+  function luFmt(v) { var d = Math.max(4, Math.min(11, 7 - Math.floor(Math.log10(v)))); return fmt(v, d) + " LU"; }
+  function buysFmt(v) { var n = 1 / v; return n >= 100 ? fmt(n, 1) : n >= 1 ? fmt(n, 3) : fmt(n, 5); }
+  function usdFmt(u) { return u >= 1000 ? "$" + fmt(u, 0) : "$" + fmt(u, 2); }
+  var bars = [];
+  function lifeItem(board, it, kind) {
+    var f = function (t) { return itemUsd(it, t) / instant(t); };
+    var unitNode = null;
+    var made = cell(board, { label: it[0], kind: "ph", tone: kind === "pay" ? "up" : kind === "mkt" ? "blue" : "", f: function (t) {
+      var v = f(t), u = itemUsd(it, t);
+      if (unitNode) unitNode.textContent = kind === "pay"
+        ? "earns " + lifeText(v) + " of an abundant day · " + buysFmt(v) + " of these to earn one Life Unit"
+        : usdFmt(u) + " · " + lifeText(v) + " of an abundant day · one Life Unit's worth buys " + buysFmt(v);
+      return luFmt(v);
+    }, unit: " ", basis: it[3] + (it[2] ? ", usually rising about " + fmt(it[2] * 100, 1) + "% a year in dollars." : ".") });
+    unitNode = made.unit;
+    var row = el("div", "lb " + kind); row.appendChild(el("span", "n", it[0]));
+    var tr = el("span", "t"), fill = el("span", "f"); tr.appendChild(fill); row.appendChild(tr);
+    var val = el("span", "v"); row.appendChild(val);
+    bars.push({ row: row, fill: fill, val: val, f: f });
+  }
+  // The hero: one month of everyday life for a family, built from the lines below.
+  function familyMonth(t) {
+    var g = function (arr, i) { return itemUsd(arr[i], t); };
+    return g(STORE, 2) + g(STORE, 9) * 52 / 12 + g(STORE, 1) * 80 + g(STORE, 10) + g(STORE, 11) * 2 + g(STORE, 12) + g(STORE, 13) + g(STORE, 16) * 2 + g(STORE, 8) * 2;
+  }
+  cell("b-basket", { hero: true, label: "One month of everyday life for a family, in Life Units", kind: "ph", f: function (t) { return luFmt(familyMonth(t) / instant(t)); }, unit: "rent on a USD 3,000 home, groceries, 80 gallons of gas, electricity, two phones, internet, streaming, health insurance for two adults, two dinners out", basis: "The sum of the matching lines below, divided by the instant Life Unit value." });
+  cell("b-basket", { label: "Hours at the US median wage to earn one Life Unit", kind: "ph", tone: "up", f: function (t) { return fmt(instant(t) / itemUsd(PAY[1], t), 4); }, unit: "hours of work for one abundant day", basis: "One Life Unit divided by the median hourly wage." });
+  cell("b-basket", { label: "Hours at the federal minimum wage to earn one Life Unit", kind: "ph", tone: "down", f: function (t) { return fmt(instant(t) / itemUsd(PAY[0], t), 3); }, unit: "hours of work for one abundant day", basis: "One Life Unit divided by USD 7.25. The gap is what the standard makes visible." });
+  STORE.forEach(function (it) { lifeItem("b-store", it, "store"); });
+  MKT.forEach(function (it) { lifeItem("b-mkt", it, "mkt"); });
+  PAY.forEach(function (it) { lifeItem("b-pay", it, "pay"); });
+  // Log scale from 1 second to 1 year of an abundant day.
+  var LB_LO = Math.log(1 / DAY), LB_HI = Math.log(365.25);
+  bars.sort(function (a, b) { return a.f(T0) - b.f(T0); }).forEach(function (b) { $("lifeBars").appendChild(b.row); });
+  function tickBars(t) {
+    bars.forEach(function (b) {
+      var v = b.f(t), p = (Math.log(v) - LB_LO) / (LB_HI - LB_LO) * 100;
+      b.fill.style.width = Math.max(0.5, Math.min(100, p)).toFixed(3) + "%";
+      b.val.textContent = luFmt(v).replace(" LU", "");
+    });
+  }
+
+  var roadCells = [];
+  ROAD.forEach(function (r) {
+    var tr = el("tr");
+    tr.appendChild(el("td", null, r[0]));
+    tr.appendChild(el("td", "d", new Date(r[1]).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" })));
+    var td = el("td", "gold"); tr.appendChild(td); roadCells.push({ td: td, when: Date.parse(r[1]) / 1000 });
+    var b = el("td", "wrapcell"); b.appendChild(tagEl(r[3])); b.appendChild(document.createTextNode(r[2])); tr.appendChild(b);
+    $("roadRows").appendChild(tr);
+  });
+
+  var coinCells = [];
+  function buildCoinRows() {
+    var body = $("coinRows"); body.textContent = ""; coinCells = [];
+    COINS.forEach(function (c) {
+      var tr = el("tr");
+      var nm = el("td", null, c.name); nm.appendChild(el("span", "sub", c.sym)); tr.appendChild(nm);
+      var ld = el("td", "gold"), plain = el("td"), price = el("td", "d"), sup = el("td", "d"), rule = el("td", "rulecell muted", c.rule);
+      [ld, plain, price, sup, rule].forEach(function (x) { tr.appendChild(x); });
+      body.appendChild(tr); coinCells.push({ c: c, ld: ld, plain: plain, price: price, sup: sup });
+    });
+    var g = el("tr");
+    g.appendChild((function () { var td = el("td", null, "Gold"); td.appendChild(el("span", "sub", "1 troy ounce")); return td; })());
+    var gl = el("td", "gold"), gp = el("td"), gu = el("td", "d"), gs = el("td", "d", "about 216,000 tonnes"), gr = el("td", "wrapcell muted", "mined at about 1 to 2% a year");
+    [gl, gp, gu, gs, gr].forEach(function (x) { g.appendChild(x); });
+    body.appendChild(g); coinCells.push({ gold: true, ld: gl, plain: gp, price: gu });
+    var d = el("tr");
+    d.appendChild((function () { var td = el("td", null, "US dollar"); td.appendChild(el("span", "sub", "and dollar stablecoins")); return td; })());
+    var dl = el("td", "gold"), dp = el("td"), du = el("td", "d", "$1.00"), ds = el("td", "d", "no limit"), dr = el("td", "wrapcell muted", "created by central banks and lenders; stablecoins follow demand");
+    [dl, dp, du, ds, dr].forEach(function (x) { d.appendChild(x); });
+    body.appendChild(d); coinCells.push({ dollar: true, ld: dl, plain: dp });
+  }
+  buildCoinRows();
+
+  function remaining(sec) {
+    if (sec <= 0) return "reached";
+    var y = Math.floor(sec / YEAR); sec -= y * YEAR;
+    var d = Math.floor(sec / DAY); sec -= d * DAY;
+    var h = Math.floor(sec / 3600); sec -= h * 3600;
+    var m = Math.floor(sec / 60), s = Math.floor(sec - m * 60);
+    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+    return (y ? y + "y " : "") + d + "d " + pad(h) + ":" + pad(m) + ":" + pad(s);
+  }
+
+  var LU_HISTORY = {"q":["2016 Q1","2016 Q2","2016 Q3","2016 Q4","2017 Q1","2017 Q2","2017 Q3","2017 Q4","2018 Q1","2018 Q2","2018 Q3","2018 Q4","2019 Q1","2019 Q2","2019 Q3","2019 Q4","2020 Q1","2020 Q2","2020 Q3","2020 Q4","2021 Q1","2021 Q2","2021 Q3","2021 Q4","2022 Q1","2022 Q2","2022 Q3","2022 Q4","2023 Q1","2023 Q2","2023 Q3","2023 Q4","2024 Q1","2024 Q2","2024 Q3","2024 Q4","2025 Q1","2025 Q2","2025 Q3","2025 Q4","2026 Q1","2026 Q2","2026 Q3"],"lu":[2056.04,2104.97,2089.79,2036.03,2036.31,2091.05,2211.55,2222.27,2319.18,2267.7,2212.8,2186.08,2201.47,2195.94,2197.66,2219.4,2200.17,2195.23,2305.14,2363.63,2425.73,2443.37,2402.39,2368.92,2381.55,2311.85,2232.79,2261.55,2392.31,2429.1,2441.41,2434.18,2450.51,2428.3,2516.33,2489.9,2459.71,2606.74,2674.28,2676.1,2706.05,2704.15,2692.31],"btc":[0.1993,0.2443,0.2951,0.3592,0.5095,0.9154,1.5786,4.2702,4.5128,3.4153,3.0722,2.3508,1.7037,3.3133,4.719,3.5988,3.7582,3.945,4.6137,7.1326,18.6755,19.0279,17.4715,23.6136,17.3382,14.0454,9.5123,7.9877,9.5619,11.5401,11.5057,14.9109,21.8661,27.0466,24.2825,33.6548,37.9285,37.9518,42.8591,37.197,28.2873,26.4842,26.4353]};
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function sEl(tag, attrs) { var e = document.createElementNS(SVGNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  function lineChart(host, values, labels, fmtY, color, title) {
+    var W = 640, H = 240, L = 64, R = 16, T = 10, B = 30;
+    var mn = Math.min.apply(null, values), mx = Math.max.apply(null, values), pad = (mx - mn) * 0.08 || 1;
+    var lo = Math.max(0, mn - pad), hi = mx + pad;
+    var x = function (i) { return L + (W - L - R) * i / (values.length - 1); };
+    var y = function (v) { return T + (H - T - B) * (1 - (v - lo) / (hi - lo)); };
+    var svg = sEl("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": title });
+    for (var g = 0; g <= 4; g++) {
+      var gv = lo + (hi - lo) * g / 4, gy = y(gv);
+      svg.appendChild(sEl("line", { x1: L, x2: W - R, y1: gy, y2: gy, stroke: "var(--line)", "stroke-width": 1 }));
+      var t = sEl("text", { x: L - 8, y: gy + 4, "text-anchor": "end" }); t.textContent = fmtY(gv); svg.appendChild(t);
+    }
+    labels.forEach(function (lb, i) { if (lb.indexOf("Q1") > -1 && (lb.slice(0, 4) % 2 === 0)) { var t = sEl("text", { x: x(i), y: H - 8, "text-anchor": "middle" }); t.textContent = lb.slice(0, 4); svg.appendChild(t); } });
+    svg.appendChild(sEl("path", { d: values.map(function (v, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); }).join(" "), fill: "none", stroke: color, "stroke-width": 2.2, "stroke-linejoin": "round" }));
+    svg.appendChild(sEl("circle", { cx: x(values.length - 1), cy: y(values[values.length - 1]), r: 4, fill: color, stroke: "var(--panel)", "stroke-width": 2 }));
+    var cross = sEl("line", { y1: T, y2: H - B, stroke: "var(--ink-soft)", "stroke-dasharray": "3 3", visibility: "hidden" }); svg.appendChild(cross);
+    var hit = sEl("rect", { x: L, y: T, width: W - L - R, height: H - T - B, fill: "transparent" }); svg.appendChild(hit);
+    host.appendChild(svg);
+    var tip = document.createElement("div"); tip.className = "ctip"; tip.hidden = true; host.appendChild(tip);
+    hit.addEventListener("mousemove", function (ev) {
+      var r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width;
+      var i = Math.max(0, Math.min(values.length - 1, Math.round((px - L) / (W - L - R) * (values.length - 1))));
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
+      tip.textContent = labels[i] + ": " + fmtY(values[i]);
+      var hr = host.getBoundingClientRect();
+      tip.style.left = Math.min(Math.max(r.left - hr.left + x(i) * r.width / W, 70), hr.width - 70) + "px";
+      tip.style.top = (r.top - hr.top + 36) + "px"; tip.hidden = false;
+    });
+    hit.addEventListener("mouseleave", function () { tip.hidden = true; cross.setAttribute("visibility", "hidden"); });
+  }
+  lineChart($("chartLU"), LU_HISTORY.lu, LU_HISTORY.q, function (v) { return "$" + Math.round(v).toLocaleString("en-US"); }, "var(--sun)", "Proxy backtest: cost of one Life Unit in dollars, 2016 to 2026, scaled to the placeholder figure");
+  lineChart($("chartBTC"), LU_HISTORY.btc, LU_HISTORY.q, function (v) { return (v >= 10 ? Math.round(v) : v.toFixed(1)) + " LU"; }, "var(--leaf)", "One Bitcoin in Life Units, 2016 to 2026, on the proxy backtest");
+
+  // ---- Shared price feed (Claude Artifact database). Every value read from it is checked before use. ----
+  function validPrice(p) { return !!p && typeof p.usd === "number" && isFinite(p.usd) && p.usd > 0; }
+  function validDate(s) { if (typeof s !== "string") return null; var ms = Date.parse(s); return isFinite(ms) ? new Date(ms) : null; }
+  function showHistory(docs) {
+    var rows = docs.filter(function (d) { return d && d.prices && validPrice(d.prices.bitcoin) && validDate(d.asOf); });
+    if (!rows.length) return;
+    var body = $("feedRows"); body.textContent = "";
+    rows.sort(function (a, b) { return validDate(b.asOf) - validDate(a.asOf); }).slice(0, 12).forEach(function (d) {
+      var when = validDate(d.asOf), btc = d.prices.bitcoin, L = ldUsd(when.getTime() / 1000), tr = document.createElement("tr");
+      [when.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }), "$" + fmt(btc.usd, 0), "$" + fmt(L, 2), fmt(btc.usd / L, 2)].forEach(function (v, i) {
+        var td = document.createElement("td"); td.textContent = v; if (i) td.className = "d"; tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+  }
+
+  function tick() {
+    var t = Date.now() / 1000, L = ldUsd(t);
+    $("nowText").textContent = new Date(t * 1000).toUTCString().replace("GMT", "UTC");
+    cells.forEach(function (c) { c.node.textContent = c.f(t); });
+    tickBars(t);
+    coinCells.forEach(function (r) {
+      var usd = r.gold ? goldUsd() : r.dollar ? 1 : (prices[r.c.id] || REF_PRICES[r.c.id]).usd;
+      var v = usd / L;
+      r.ld.textContent = v >= 100 ? fmt(v, 2) : v >= 1 ? fmt(v, 4) : v >= 0.001 ? fmt(v, 6) : v.toPrecision(4);
+      r.plain.textContent = lifeText(v);
+      if (r.price) r.price.textContent = usd >= 100 ? "$" + fmt(usd, 0) : "$" + (usd >= 1 ? fmt(usd, 2) : usd.toPrecision(3));
+      if (r.sup) r.sup.textContent = fmt(r.c.s0 + (t - T0) * r.c.perSec, r.c.s0 < 1e9 ? 3 : 0);
+    });
+    roadCells.forEach(function (r) { r.td.textContent = remaining(r.when - t); });
+  }
+  tick();
+  setInterval(tick, 100);
+
+  function showFeed(state, text) { $("feedPill").className = "pill" + (state ? " " + state : ""); $("feedText").textContent = text; }
+  showFeed("stale", "Using reference prices from 8 October 2026");
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("db").then(function (db) {
+      if (!db) return;
+      db.collection("history").get().then(function (q) { showHistory((q && q.docs || []).map(function (d) { return d.data(); }).filter(Boolean)); }, function () {});
+      db.doc("market/latest").onSnapshot(function (snap) {
+        var d = snap && snap.exists && snap.data();
+        if (!d || !d.prices || !validPrice(d.prices.bitcoin)) return;
+        var merged = {}; Object.keys(REF_PRICES).forEach(function (k) { merged[k] = validPrice(d.prices[k]) ? d.prices[k] : REF_PRICES[k]; });
+        prices = merged; feedAsOf = validDate(d.asOf);
+        var age = feedAsOf ? (Date.now() - feedAsOf.getTime()) / 36e5 : Infinity;
+        var source = typeof d.source === "string" ? d.source.slice(0, 40) : "feed";
+        showFeed(age < 36 ? "live" : "stale", "Coin prices as of " + (feedAsOf ? feedAsOf.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "unknown time") + " · " + source);
+      }, function () {});
+    }, function () {});
+  }
+
+  // ---- Try ur own numbers: scenario calculator. Reads only its own inputs; writes with textContent only. ----
+  var CONV_IN = { amount: "convAmount", luValue: "convLU" };
+  var BUD_IN = { living: "bLivingIn", homePrice: "bHomePrice", homeYears: "bHomeYears", homeRunPct: "bHomeRun", vehPrice: "bVehPrice", vehYears: "bVehYears", vehResalePct: "bVehResale", vehRun: "bVehRun", saving: "bSave", taxPct: "bTax" };
+  var BUD_OUT = { living: "bLiving", home: "bHome", vehicle: "bVehicle", saving: "bSaving", net: "bNet", tax: "bTaxOut", gross: "bGross" };
+  var lastBudget = null;
+  function money(v) { return "$" + fmt(v, 2); }
+  function readInputs(map) { var v = {}; Object.keys(map).forEach(function (k) { v[k] = $(map[k]).value; }); return v; }
+  function markInputs(map, bad) { Object.keys(map).forEach(function (k) { $(map[k]).setAttribute("aria-invalid", bad && bad[k] ? "true" : "false"); }); }
+  function luText(v) { return v === 0 ? "0 LU" : luFmt(v); }
+  function updateConv() {
+    try {
+      var r = M.convert(readInputs(CONV_IN));
+      markInputs(CONV_IN, null);
+      $("convOut").textContent = luText(r.lifeUnits);
+      $("convTime").textContent = r.lifeUnits > 0 ? (r.lifeUnits >= 1 ? "That is " + fmt(r.lifeUnits, 2) + " abundant days, at " : "That is " + lifeText(r.lifeUnits) + " of an abundant day, at ") + money(r.luValue) + " per Life Unit." : "Zero dollars is zero Life Units.";
+      $("convEq").textContent = money(r.amount) + " ÷ " + money(r.luValue) + " per LU = " + luText(r.lifeUnits);
+      $("convErr").textContent = "";
+    } catch (e) {
+      markInputs(CONV_IN, e.fields || {});
+      $("convOut").textContent = "Unavailable";
+      $("convTime").textContent = "Fix the highlighted number to see the result.";
+      $("convEq").textContent = "Dollar amount ÷ value of one Life Unit";
+      $("convErr").textContent = e.message;
+    }
+  }
+  function updateBudget() {
+    try {
+      var r = M.budget(readInputs(BUD_IN));
+      lastBudget = r; markInputs(BUD_IN, null);
+      Object.keys(BUD_OUT).forEach(function (k) { $(BUD_OUT[k]).textContent = money(r[k]); });
+      $("bDetail").textContent = "Home: " + money(r.homePriceShare) + " a day of the sale price plus " + money(r.homeRunning) + " upkeep, tax and insurance. Vehicle: " + money(r.vehicleValueLoss) + " a day of value lost after a trade-in credit of " + money(r.resaleCredit) + ", plus " + money(r.vehicleRunning) + " running costs.";
+      $("budgetErr").textContent = r.gross < 0.01 ? "A budget of at least USD 0.01 a day is needed to use it as a Life Unit value." : "";
+      $("useBudget").disabled = r.gross < 0.01;
+    } catch (e) {
+      lastBudget = null; markInputs(BUD_IN, e.fields || {});
+      Object.keys(BUD_OUT).forEach(function (k) { $(BUD_OUT[k]).textContent = "Unavailable"; });
+      $("bDetail").textContent = "Fix the highlighted numbers to see the budget.";
+      $("budgetErr").textContent = e.message;
+      $("useBudget").disabled = true;
+    }
+  }
+  $("convForm").addEventListener("submit", function (ev) { ev.preventDefault(); });
+  $("budgetForm").addEventListener("submit", function (ev) { ev.preventDefault(); });
+  $("convForm").addEventListener("input", updateConv);
+  $("budgetForm").addEventListener("input", updateBudget);
+  $("convForm").addEventListener("reset", function () { setTimeout(updateConv, 0); });
+  $("budgetForm").addEventListener("reset", function () { setTimeout(updateBudget, 0); });
+  $("useClock").addEventListener("click", function () { $("convLU").value = fmt(ldUsd(Date.now() / 1000), 2); updateConv(); });
+  $("useBudget").addEventListener("click", function () { if (lastBudget && lastBudget.gross >= 0.01) { $("convLU").value = fmt(lastBudget.gross, 2); updateConv(); } });
+  updateConv(); updateBudget();
+})();
+</script>
+</body>
+</html>
